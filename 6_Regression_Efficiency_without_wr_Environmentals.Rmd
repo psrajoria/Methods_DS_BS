@@ -1,0 +1,396 @@
+---
+title: "6_Regression_Efficiency_without_wr_Environmentals"
+output: html_document
+date: '2022-07-18'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data reading using package **openxlsx**
+```{r readingData}
+require(openxlsx)
+ mydata  <- read.xlsx("Data - Seminar.xlsx", startRow=3)
+
+```
+## chunk 1: Linear Regression model: efficiency without weight restrictions ~ environmental variables (identification of costdrivers/location factors)
+```{r}
+# Pearson and Spearman correlation coefficients show weak significant correlation 
+# partial correlation analysis seems to indicate weak direct correlations 
+# scatterplots show that a linear regression might not be suitable 
+```
+## chunk 2: definition of subset 
+```{r}
+# subset without artificially generated data for balanced plm 
+companies_raw <- c(-5,-6,-11,-12,-17,-18,-23,-24,-29,-30,-35,-36,-41,-42,-47,-48,-53, -54)
+mydata_balanced <- mydata[companies_raw, -1]
+
+```
+## chunk 3: OLS model: efficiency without weight restrictions ~ environmental variables 
+
+```{r}
+require (robustbase)
+require(car)
+
+OLS <-lm(formula= mydata_balanced$Efficiency.without.Weight.restrictions ~ mydata_balanced$Age.of.assets + mydata_balanced$`(Age.of.assets).square` + mydata_balanced$Average.declivity + mydata_balanced$Intersection.with.indigenous.areas + mydata_balanced$Height.of.vegetation + mydata_balanced$Percentage.of.high.vegetation + mydata_balanced$Average.precipitation + mydata_balanced$Network.density + mydata_balanced$Fire.incidence + mydata_balanced$Number.of.intersections.with.roads + mydata_balanced$Coincidence.of.network.lines + mydata_balanced$Density.of.lightening + mydata_balanced$Number.of.access.to.roads, data = mydata_balanced)
+
+summary(OLS)
+
+## Variance Inflation Factor Analysis
+# to check if the variables have correlation or not. For example, cons: 0.98. That mean 98% of "cons" can be explained by the other variables. So, we may exclude this variable if needed. When, "NTLaj" is 0.54, that means only 54% of this variable can be explained by the other variables.
+
+print(vif(OLS))
+print(1 - 1/vif(OLS))
+
+# if VIF is higher than 1/(1-R_squared), where R_squared is the multiple R_squared, then the predictor is more related to other predictors than to the response 
+print("1/(1-R_squared)")
+print(1/(1-0.65))
+
+# print residualplot of OLS 
+residualPlot(OLS)
+
+
+
+```
+## chunk 4:  OLS model: efficiency without weight restrictions ~ environmental variables  with feature selection 
+```{r}
+require(robustbase)
+require(car)
+OLS <- lm (formula= mydata_balanced$Efficiency.without.Weight.restrictions ~ mydata_balanced$Age.of.assets + mydata_balanced$`(Age.of.assets).square` + mydata_balanced$Average.declivity + mydata_balanced$Intersection.with.indigenous.areas + mydata_balanced$Height.of.vegetation + mydata_balanced$Percentage.of.high.vegetation + mydata_balanced$Average.precipitation + mydata_balanced$Network.density + mydata_balanced$Fire.incidence + mydata_balanced$Number.of.intersections.with.roads + mydata_balanced$Coincidence.of.network.lines + mydata_balanced$Density.of.lightening + mydata_balanced$Number.of.access.to.roads, data = mydata_balanced)
+
+# Stepwise forward and backward selection
+OLS <- step(OLS,trace = 0, k = 2, direction = "both")
+
+summary(OLS)
+
+# print the calculated AIC of OLS 
+print("AIC")
+print(AIC(OLS, k=2))
+
+
+
+
+# OLS after feature selection adjusted  according to VIF
+
+OLS_adj <- lm(formula = mydata_balanced$Efficiency.without.Weight.restrictions ~ 
+    mydata_balanced$Age.of.assets + mydata_balanced$Intersection.with.indigenous.areas + 
+        mydata_balanced$Height.of.vegetation + mydata_balanced$Average.precipitation + 
+        mydata_balanced$Network.density + mydata_balanced$Fire.incidence + 
+        mydata_balanced$Number.of.intersections.with.roads + 
+        mydata_balanced$Coincidence.of.network.lines + mydata_balanced$Density.of.lightening + 
+        mydata_balanced$Number.of.access.to.roads, data = mydata_balanced)
+
+summary (OLS_adj)
+
+print("AIC OLS_adj1")
+print(AIC(OLS_adj, k=2))
+
+# Breusch-Pagan test for homoskedasticity 
+
+require(lmtest)
+
+BP <- bptest(OLS)
+
+print(BP)
+
+## Variance Inflation Factor Analysis
+# to check if the variables have correlation or not. For example, cons: 0.98. That mean 98% of "cons" can be explained by the other variables. So, we may exclude this variable if needed. When, "NTLaj" is 0.54, that means only 54% of this variable can be explained by the other variables.
+
+# OLS
+print(vif(OLS))
+print(1 - 1/vif(OLS))
+print("1/(1-R_suqared")
+print(1/(1-0.6466))
+
+# OLS_adj
+print(vif(OLS_adj))
+print(1 - 1/vif(OLS_adj))
+print("1/(1-R_suqared")
+print(1/(1-0.6091))
+
+# model prediction
+yhat <- predict(OLS_adj)
+
+# compute MSE 
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("MSE")
+print(MSE)
+
+#compute RMSE
+RMSE <- rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("RMSE")
+print(RMSE)
+
+# print residualplot of OLS_adj
+residualPlot(OLS_adj)
+
+
+```
+## chunk 5: cross-validation lm model after feature selection
+```{r}
+
+require(caret)
+set.seed(123)
+
+# cross validation 
+
+# Define training control
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = mydata_balanced[,c(13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25)], y = mydata_balanced[,27], method = "lm", trControl = train.control)
+ 
+# Summarize the results
+ summary(model)
+
+```
+## chunk 6: Pooled OLS model: efficiency without weight restrictions ~ environmental variables after feature selection 
+
+```{r}
+require(plm)
+
+OLS <- plm(formula = mydata_balanced$Efficiency.without.Weight.restrictions ~ 
+    mydata_balanced$Age.of.assets  + 
+        mydata_balanced$Intersection.with.indigenous.areas + 
+        mydata_balanced$Height.of.vegetation + mydata_balanced$Average.precipitation + 
+        mydata_balanced$Network.density + mydata_balanced$Fire.incidence + 
+        mydata_balanced$Number.of.intersections.with.roads + 
+        mydata_balanced$Coincidence.of.network.lines + mydata_balanced$Density.of.lightening + 
+        mydata_balanced$Number.of.access.to.roads, data = mydata_balanced, model = "pooling", index = NULL)
+
+summary (OLS)
+
+```
+## chunk 7: check assumption of homoscedasticity and auto-correlation for OLS model: efficiency without weight restrictions ~ environmental variables after feature selection 
+```{r}
+# space for the plot
+par(mfrow=c(1,1))
+
+# residuals of OLS model
+res <- as.vector(OLS$residuals)
+
+# fitted values from the OLS model 
+fitval <- as.vector(fitted(OLS))
+
+
+# plot residuals against fitted values 
+plot(fitval, res, xlab = "fitted value", ylab = "residuals", main = "Homoskedasticity Test")
+abline(lm(res ~ fitval, data = data.frame(res, fitval)), col = "blue")
+
+
+# Breusch-Pagan test for homoskedasticity 
+
+require(lmtest)
+
+BP <- bptest(OLS)
+
+print(BP)
+
+
+# Durbin-Watson-Test for autocorrelation of disturbances 
+
+dwtest(formula = mydata_balanced$Efficiency.without.Weight.restrictions ~ 
+    mydata_balanced$Age.of.assets + mydata_balanced$`(Age.of.assets).square` + 
+        mydata_balanced$Intersection.with.indigenous.areas + 
+        mydata_balanced$Height.of.vegetation + mydata_balanced$Average.precipitation + 
+        mydata_balanced$Network.density + mydata_balanced$Fire.incidence + 
+        mydata_balanced$Number.of.intersections.with.roads + 
+        mydata_balanced$Coincidence.of.network.lines + mydata_balanced$Density.of.lightening + 
+        mydata_balanced$Number.of.access.to.roads, data = mydata_balanced)
+
+```
+## chunk 8: Fixed Effect Model (FE): efficiency without weigth restrictions after feature selection 
+```{r}
+
+require(plm)
+
+
+# FE with individual effects 
+
+FE_individual <- plm(formula = mydata_balanced$Efficiency.without.Weight.restrictions ~ 
+    mydata_balanced$Age.of.assets  + 
+        mydata_balanced$Intersection.with.indigenous.areas + 
+        mydata_balanced$Height.of.vegetation + mydata_balanced$Average.precipitation + 
+        mydata_balanced$Network.density + mydata_balanced$Fire.incidence + 
+        mydata_balanced$Number.of.intersections.with.roads + 
+        mydata_balanced$Coincidence.of.network.lines + mydata_balanced$Density.of.lightening + 
+        mydata_balanced$Number.of.access.to.roads, data = mydata_balanced, model = "within", index = NULL, effect = "individual")
+
+summary(FE_individual)
+print("fixed effects")
+summary(fixef(FE_individual))
+
+# FE with time effects 
+
+FE_time <- plm(formula = mydata_balanced$Efficiency.without.Weight.restrictions ~ 
+    mydata_balanced$Age.of.assets  + 
+        mydata_balanced$Intersection.with.indigenous.areas + 
+        mydata_balanced$Height.of.vegetation + mydata_balanced$Average.precipitation + 
+        mydata_balanced$Network.density + mydata_balanced$Fire.incidence + 
+        mydata_balanced$Number.of.intersections.with.roads + 
+        mydata_balanced$Coincidence.of.network.lines + mydata_balanced$Density.of.lightening + 
+        mydata_balanced$Number.of.access.to.roads, data = mydata_balanced, model = "within", index = NULL, effect = "time")
+
+summary(FE_time)
+print("fixed effects")
+summary(fixef(FE_time))
+
+
+# FE with both effects 
+
+FE_both <- plm(formula = mydata_balanced$Efficiency.without.Weight.restrictions ~ 
+    mydata_balanced$Age.of.assets  + 
+        mydata_balanced$Intersection.with.indigenous.areas + 
+        mydata_balanced$Height.of.vegetation + mydata_balanced$Average.precipitation + 
+        mydata_balanced$Network.density + mydata_balanced$Fire.incidence + 
+        mydata_balanced$Number.of.intersections.with.roads + 
+        mydata_balanced$Coincidence.of.network.lines + mydata_balanced$Density.of.lightening + 
+        mydata_balanced$Number.of.access.to.roads, data = mydata_balanced, model = "within", index = NULL, effect = "twoways")
+
+summary(FE_both)
+print("fixed effects")
+summary(fixef(FE_both))
+
+# model prediction
+yhat_individual <- predict(FE_individual)
+yhat_time <- predict(FE_time)
+yhat_both <- predict(FE_both)
+
+# compute MSE 
+require(ModelMetrics)
+
+print("MSE individual")
+print(mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat_individual))
+print("MSE time")
+print(mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat_time))
+print("MSE both")
+print(mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat_both))
+
+#compute RMSE
+
+print("RMSE individual")
+print(rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat_individual))
+print("RMSE time")
+print(rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat_time))
+print("RMSE both")
+print(rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat_both))
+
+
+
+```
+## chunk 9:  F-Test for fixed effects 
+```{r}
+
+# H0: no difference between the FE and the Pooled model 
+# reject the hypothesis if p-value < 0.05 
+
+# individual effects 
+pFtest(FE_individual, OLS_adj)
+
+
+# time effects 
+pFtest(FE_time, OLS_adj)
+
+# both effects
+pFtest(FE_both, OLS_adj)
+
+```
+## chunk 10: Random Effect Model (RE): efficiency without weight restrictions ~ environmental variables after feature selection
+```{r}
+require(plm)
+
+# RE with individual effects
+
+RE_individual <- plm(formula = mydata_balanced$Efficiency.without.Weight.restrictions ~ 
+    mydata_balanced$Age.of.assets  + 
+        mydata_balanced$Intersection.with.indigenous.areas + 
+        mydata_balanced$Height.of.vegetation + mydata_balanced$Average.precipitation + 
+        mydata_balanced$Network.density + mydata_balanced$Fire.incidence + 
+        mydata_balanced$Number.of.intersections.with.roads + 
+        mydata_balanced$Coincidence.of.network.lines + mydata_balanced$Density.of.lightening + 
+        mydata_balanced$Number.of.access.to.roads, data = mydata_balanced, model = "random", index = NULL, effect = "individual")
+
+summary(RE_individual)
+
+# RE with  time effects 
+
+RE_time <- plm(formula = mydata_balanced$Efficiency.without.Weight.restrictions ~ 
+    mydata_balanced$Age.of.assets  + 
+        mydata_balanced$Intersection.with.indigenous.areas + 
+        mydata_balanced$Height.of.vegetation + mydata_balanced$Average.precipitation + 
+        mydata_balanced$Network.density + mydata_balanced$Fire.incidence + 
+        mydata_balanced$Number.of.intersections.with.roads + 
+        mydata_balanced$Coincidence.of.network.lines + mydata_balanced$Density.of.lightening + 
+        mydata_balanced$Number.of.access.to.roads, data = mydata_balanced, model = "random", index = NULL, effect = "time", random.method = "amemiya")
+
+summary(RE_time)
+
+# RE with  individual and time effects 
+
+RE_both <- plm(formula = mydata_balanced$Efficiency.without.Weight.restrictions ~ 
+    mydata_balanced$Age.of.assets + 
+        mydata_balanced$Intersection.with.indigenous.areas + 
+        mydata_balanced$Height.of.vegetation + mydata_balanced$Average.precipitation + 
+        mydata_balanced$Network.density + mydata_balanced$Fire.incidence + 
+        mydata_balanced$Number.of.intersections.with.roads + 
+        mydata_balanced$Coincidence.of.network.lines + mydata_balanced$Density.of.lightening + 
+        mydata_balanced$Number.of.access.to.roads, data = mydata_balanced, model = "random", index = NULL, effect = "twoways", random.method = "amemiya")
+
+summary(RE_both)
+
+# model prediction
+yhat_individual <- predict(RE_individual)
+yhat_time <- predict(RE_time)
+yhat_both <- predict(RE_both)
+
+# compute MSE 
+require(ModelMetrics)
+
+print("MSE individual")
+print(mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat_individual))
+print("MSE time")
+print(mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat_time))
+print("MSE both")
+print(mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat_both))
+
+#compute RMSE
+
+print("RMSE individual")
+print(rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat_individual))
+print("RMSE time")
+print(rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat_time))
+print("RMSE both")
+print(rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat_both))
+
+```
+
+# chunk 11:  Lagrange-Multiplier-Test  for random effects 
+```{r}
+# H0: effects cannot be modeled as random variables 
+# Ho is rejected, if p-value < 0.05
+
+# individual effects 
+plmtest(RE_individual, effect = "individual")
+
+
+# time effects 
+plmtest(RE_time, effect = "time")
+
+# both effects
+plmtest(RE_both, effect = "twoways")
+
+```
+## chunk 12: Hausman Test to compare FE and RE after feature selection 
+```{r}
+# The null hypothesis of this test states that random effects is preferred over fixed effects
+# Ho: there is no correlation between the subject-specific error term and the independent variables
+
+phtest(FE_individual, RE_individual)
+phtest(FE_time, RE_time)
+phtest(FE_both, RE_both)
+
+
+```

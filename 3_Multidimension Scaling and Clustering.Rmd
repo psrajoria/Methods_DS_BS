@@ -1,0 +1,907 @@
+---
+title: "3_Multidimension Scaling and Clustering"
+output: html_document
+date: '2022-05-18'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+remotes::install_github("dmurdoch/rgl")
+
+## Data reading using package **openxlsx**
+```{r readingData}
+require(openxlsx)
+ mydata  <- read.xlsx("Data - Seminar.xlsx", startRow=3)
+```
+
+## Basics
+```{r}
+library(ggplot2)
+# choice of colors 
+colors <- c("black", "red", "green", "blue", "magenta", "orange", "darkturquoise", "grey", "forestgreen", "gold","darkviolet", "orangered4", "steelblue1", "burlywood3" )
+
+# choice of plot symbols for different years
+pchs <- c(15, 17, 18, 19)
+# choice of plot symbols for clusters
+pchs_2 <- c(15, 16, 17, 18, 3, 8)
+
+
+# company names subset
+names <- mydata$company
+
+# years subset
+years <- mydata$year
+
+# Create groups according to the company name 
+group <- ifelse(names == "CEEE-GT" , "CEE-GT", ifelse(names == "CELG G&T", "CELG G&T", ifelse (names == "CEMIG-GT", "CEMIG-GT", ifelse (names == "CHESF", "CHESF", ifelse (names == "COPEL-GT", "COPEL-GT", ifelse (names=="CTEEP", "CTEEP", ifelse(names =="ELETRONORTE", "ELETRONORTE", ifelse(names == "ELETROSUL", "ELETROSUL", ifelse (names == "FURNAS", "FURNAS", ifelse(names=="STATE GRID_HOL", "STATE GRID_HOL", ifelse (names=="TAESA_HOL", "TAESA_HOL", ifelse(names=="TBE_HOL", "TBE_HOL", ifelse(names=="ALUPAR_HOL", "ALUPAR_HOL", ifelse(names=="CELEO_HOL", "CELEO_HOL", "others"))))))))))))))
+
+# Create groups according to the year 
+group_year <- ifelse(years=="2013", "2013", ifelse(years=="2014", "2014", ifelse(years=="2015", "2015", ifelse(years=="2016", "2016", "9999"))))
+
+
+# container TSOs from 2013 to 2016 without artificially generated data and holdings 
+TSOs <- c(-5,-6,-11,-12,-17,-18,-23,-24,-29,-30,-35,-36,-41,-42,-47,-48,c(-53:-74))
+
+# all internal and environmental variables 
+features <- c(4:26)
+
+# classical MDS preparation
+
+# subset of all internal and external variables and Efficiency measures for all companies (TSOs and holdings and artificially generated data)
+subset <- data.frame(mydata[, features] )
+
+# euclidean distance between the rows 
+distance <- dist(subset, method="euclidean", diag=TRUE)
+distance <- as.matrix(distance)
+
+#print distance matrix 
+print(distance)
+
+```
+
+## Chunk 1: Classical MDS (2 dimensions) reducing attributes
+```{r GraphsBasics, fig.width=9}
+
+# space for the plot
+par(mfrow=c(1,1))
+# space for the legend 
+par(mar=c(5,5,5,15), xpd=TRUE)
+
+#expand max.print
+options(max.print=1000000)
+
+# dimensions to scale to 
+k <- 2
+
+#classical multidimensional scaling 
+mds <- cmdscale(distance, k, eig=TRUE)
+
+# expand mds data frame by company name and year 
+mds_adj <- data.frame(mydata$company, mydata$year, mds$points[,1], mds$points[,2] )
+
+# create data frame 
+df_mds <- data.frame(x = mds_adj$mds.points...1., y = mds_adj$mds.points...2., group_name = factor(group), group_20XX=factor(group_year))
+
+# plot solution 
+plot (df_mds$x, df_mds$y, main = "Classical MDS (2D)", xlab="Dim. 1", ylab="Dim. 2", col = colors[df_mds$group_name], pch = pchs[df_mds$group_20XX], frame=TRUE)
+
+# create legends
+legend(x="topright",inset=(c(-0.4,0)), y= "right", legend=c("CEEE-GT", "CELG G&T", "CEMIG-GT",  "CHESF", "COPEL-GT","CTEEP", "ELETRONORTE", "ELETROSUL","FURNAS", "STATE GRID_HOL", "TAESA_HOL", "TBE_HOL", "ALUPAR_HOL", "CELEO_HOL" ), fill=colors)
+legend(x="bottomright", inset=(c(-0.4,-0.15)), y= "right", legend = c("2013", "2014", "2015", "2016"), pch = pchs)
+
+# subset after MDS (2D) and Min/Max Normalization
+dim1_norm <- (mds$points[,1]- min(mds$points[,1]))/(max(mds$points[,1])-min(mds$points[,1]))
+dim2_norm <- (mds$points[,2]- min(mds$points[,2]))/(max(mds$points[,2])-min(mds$points[,2]))
+subset_mds2D <- data.frame(dim1_norm, dim2_norm)
+```
+## Chunk 2: Classical MDS (3 dimensions) reducing attributes
+```{r GraphsBasics, fig.width=9}
+require(car)
+
+# space for the plot
+par(mfrow=c(1,1))
+# space for the legend 
+par(mar=c(5,5,5,15), xpd=TRUE)
+
+#expand max.print
+options(max.print=1000000)
+
+# dimensions to scale to 
+k <- 3
+
+#classical multidimensional scaling 
+mds3 <- cmdscale(distance, k, eig=TRUE)
+
+print(mds3$points)
+
+# expand mds data frame by company name and year 
+mds3_adj <- data.frame(mydata$company, mydata$year, mds3$points[,1], mds3$points[,2], mds3$points[,3] )
+
+# create data frame 
+df_mds3 <- data.frame(x = mds3_adj$mds3.points...1., y = mds3_adj$mds3.points...2., z = mds3_adj$mds3.points...3., group_name = factor(group), group_20XX=factor(group_year))
+
+# plot solution 
+scatter3d(df_mds3$x, df_mds3$y, df_mds3$z, point.col = colors[df_mds3$group_name], 
+              grid = FALSE, surface = FALSE, box = FALSE, ellipsoid = FALSE, xlab = "Dim. 1", 
+              ylab = "Dim. 2", zlab = "Dim. 3", main = "Classical MDS (3D)")
+
+# subset after MDS (3D) and Min/Max normalization
+dim1_norm <- (mds3$points[,1]- min(mds3$points[,1]))/(max(mds3$points[,1])-min(mds3$points[,1]))
+dim2_norm <- (mds3$points[,2]- min(mds3$points[,2]))/(max(mds3$points[,2])-min(mds3$points[,2]))
+dim3_norm <- (mds3$points[,3]- min(mds3$points[,3]))/(max(mds3$points[,3])-min(mds3$points[,3]))
+subset_mds3D <- data.frame(dim1_norm, dim2_norm, dim3_norm)
+```
+
+## Chunk 3: Classical MDS (2 dimension) reducing companies & years
+```{r, fig.width=10}
+# container TSOs from 2013 to 2016 without artificially generated data and holdings 
+TSOs <- c(-5,-6,-11,-12,-17,-18,-23,-24,-29,-30,-35,-36,-41,-42,-47,-48, -53, -54)
+
+# Matrix transposing
+df2 <- data.frame(t(mydata[-1]))
+colnames(df2) <- mydata[, 1]
+df2
+
+# Classical MDS preparation
+# Subsets of Output and Enviro
+subset_o <- data.frame(df2[c(4:12),TSOs])
+subset_e <- data.frame(df2[c(13:25),TSOs])
+
+# Euclidean distance between the rows 
+distance_o <- dist(subset_o)
+distance_o <- as.matrix(distance_o)
+
+distance_e <- dist(subset_e)
+distance_e <- as.matrix(distance_e)
+
+# Multidimensional Scaling 2D
+fit_o <- cmdscale(distance_o,eig=TRUE, k=2) # k is the number of dim
+fit_e <- cmdscale(distance_e,eig=TRUE, k=2) # k is the number of dim
+
+# Creation of reduced data frame containing Outputs or enviromentals
+total_o <- data.frame(dim1 = fit_o$points[,1],
+                 dim2 = fit_o$points[,2])
+total_e <- data.frame(dim1 = fit_e$points[,1],
+                 dim2 = fit_e$points[,2])
+
+# Plotting of the solution of the outputs
+ggplot(total_o, aes(x=dim1, y=dim2, color = row.names(total_o))) + 
+    geom_point(size = 5) + theme(legend.key.size = unit(4, 'cm'), #change legend key size
+        legend.key.height = unit(2, 'cm'), #change legend key height
+        legend.key.width = unit(2, 'cm'), #change legend key width
+        legend.title = element_text(face = "bold", size=25), #change legend title font size
+        legend.text = element_text(size=20)) +
+        scale_y_continuous(labels = scales::comma) + scale_x_continuous(labels = scales::comma) +
+        theme(axis.title.x = element_text(size = 24, face = "bold")) +
+        theme(axis.title.y = element_text(size = 24, face = "bold")) + 
+        theme(axis.text = element_text(size = 17, face="bold")) +
+        labs(y = "Dimension 2", x = "Dimenson 1", color = "Output Variables")
+
+# Plotting of the solution of the enviromental variables
+ggplot(total_e, aes(x=dim1, y=dim2, color = row.names(total_e))) +
+    geom_point(size = 5) + theme(legend.key.size = unit(4, 'cm'), #change legend key size
+        legend.key.height = unit(2, 'cm'), #change legend key height
+        legend.key.width = unit(2, 'cm'), #change legend key width
+        legend.title = element_text(face = "bold", size=25), #change legend title font size
+        legend.text = element_text(size=20)) +
+        scale_y_continuous(labels = scales::comma) + scale_x_continuous(labels = scales::comma) +
+        theme(axis.title.x = element_text(size = 24, face = "bold")) +
+        theme(axis.title.y = element_text(size = 24, face = "bold")) + 
+        theme(axis.text = element_text(size = 17, face="bold")) +
+        labs(y = "Dimension 2", x = "Dimenson 1", color = "Enviromental Variables")
+```
+## Chunk 4: K-Means clustering (Non-MDS)
+```{r}
+# Min/Max normalization subset 
+
+index <- 1
+
+for (index in 1:ncol(subset)){
+ 
+  # normalization 
+ dim_norm <- (subset[,index]- min(subset[,index]))/(max(subset[,index])-min(subset[,index]))
+ 
+ # dataframe of normalized subset
+  subset_norm[,index] <- data.frame(dim_norm)
+  
+  # increase index 
+  index = index + 1
+}
+
+# cluster tendency 
+
+#Calculated values 0-0.3 indicate regularly-spaced data. Values around 0.5 indicate random data. Values 0.7-1 indicate clustered data.
+
+# set seed for random numbers 
+set.seed(123)
+
+# compute Hopkins statistic for the dataset of MDS 2D 
+hopkins <- hopkins(subset_norm, m = ceiling(nrow(subset_mds2D)/10))
+
+# print result (result is 1-hopkins statistic)
+print(hopkins)
+
+# determination of optimal number of clusters 
+
+require (NbClust)
+
+# determine optimal number of clusters 
+# error
+#NbClust(data= subset_norm, distance = "euclidean", min.nc=2, max.nc=9, method="kmeans", index="all", alphaBeale = 0.1)
+
+# define number of clusters
+k <- 2
+
+# cluster packages
+require(cluster)
+require(fpc)
+require(ggplot2)
+
+# space for the plot
+par(mfrow=c(1,1))
+# space for the legend 
+par(mar=c(5,5,5,15), xpd=TRUE)
+
+# set seed for random number generation 
+set.seed(123)
+  
+  #k-means clustering 
+clust_result <- kmeans (subset_norm, k, nstart=25 )
+
+# export console Output 
+file <- file("C:\\Users\\Kira\\OneDrive\\Controlling Seminar\\Seminar Controlling\\Abbildungen\\Clustering\\kmeans2_non_mds.txt") 
+sink(file, append = TRUE, type = "output")
+
+# print results 
+print(clust_result)
+
+# cluster statistics 
+km_stats <- cluster.stats(dist(subset_norm), clust_result$cluster)
+km_stats
+
+# stop export 
+sink()
+
+# silhouette analysis 
+require(cluster)
+
+# silhouette coefficient of observation 
+sil <- silhouette(clust_result$cluster, dist(subset_norm))
+print(sil)
+
+# interpretation: obversations with large S_i (near 1) are very well clustered; a small S_i (near 0) means the observation lies between two clusters; observations with a negative S_i are probably placed in the wrong cluster 
+
+# summary of silhouette analysis 
+si.sum <- summary(sil)
+print("summary")
+print(si.sum)
+
+# define filename for plot
+filename <- "C:\\Users\\Kira\\OneDrive\\Controlling Seminar\\Seminar Controlling\\Abbildungen\\Clustering\\kmeans2_non_mds_sil.png"
+
+# start export png
+png(filename=filename, width=960, height=480)
+
+#plot silhouette 
+plot(sil, main = "Silhouette plot kmeans Clustering (k=2, Non-MDS)")
+
+# stop export 
+dev.off()
+
+# define number of clusters
+k <- 4
+
+# cluster packages
+require(cluster)
+require(fpc)
+require(ggplot2)
+
+# space for the plot
+par(mfrow=c(1,1))
+# space for the legend 
+par(mar=c(5,5,5,15), xpd=TRUE)
+
+# set seed for random number generation 
+set.seed(123)
+  
+  #k-means clustering 
+clust_result <- kmeans (subset_norm, k, nstart=25 )
+
+# export console Output 
+file <- file("C:\\Users\\Kira\\OneDrive\\Controlling Seminar\\Seminar Controlling\\Abbildungen\\Clustering\\kmeans4_non_mds.txt") 
+sink(file, append = TRUE, type = "output")
+
+# print results 
+print(clust_result)
+
+# cluster statistics 
+km_stats <- cluster.stats(dist(subset_norm), clust_result$cluster)
+km_stats
+
+# stop export 
+dev.off()
+
+# silhouette analysis 
+require(cluster)
+
+# silhouette coefficient of observation 
+sil <- silhouette(clust_result$cluster, dist(subset_norm))
+print(sil)
+
+# interpretation: obversations with large S_i (near 1) are very well clustered; a small S_i (near 0) means the observation lies between two clusters; observations with a negative S_i are probably placed in the wrong cluster 
+
+# summary of silhouette analysis 
+si.sum <- summary(sil)
+print("summary")
+print(si.sum)
+
+# define filename for plot
+filename <- "C:\\Users\\Kira\\OneDrive\\Controlling Seminar\\Seminar Controlling\\Abbildungen\\Clustering\\kmeans4_non_mds_sil.png"
+
+# start export png
+png(filename=filename, width=960, height=480)
+
+#plot silhouette 
+plot(sil, main = "Silhouette plot kmeans Clustering (k=4, Non-MDS)")
+
+# stop export 
+dev.off()
+
+```
+
+## Chunk 5: Testing kmeans clustering with k from 2 to 6 (MDS 2D)
+```{r fig.width =9}
+require(cluster)
+require(fpc)
+# space for the plot
+par(mfrow=c(1,1))
+# space for the legend 
+par(mar=c(5,5,5,15), xpd=TRUE)
+
+# set seed for random number generation 
+set.seed(123)
+
+# define initial number of clusters
+k <- 2
+
+# vary number of clusters
+for (k in 2:6){
+  
+  #k-means clustering 
+clust2_result <- kmeans (subset_mds2D, k, nstart=25 )
+
+# print results 
+print(clust2_result)
+
+# plot results 
+library(cluster)
+
+# define filename for plot
+filename <- paste("C:\\Users\\Kira\\OneDrive\\Controlling Seminar\\Seminar Controlling\\Abbildungen\\Clustering\\kmeans_k_test\\kmeans_",k,"_test_mds2D.png", sep="")
+
+# start export png
+png(filename=filename, width=960, height=480)
+
+plot (x = subset_mds2D[,1], y =  subset_mds2D[,2], main= paste("kmeans Clustering (k = ", k, ")", sp="" ), xlab="Dim. 1", ylab = "Dim.2",  col= colors[df_mds$group_name], pch = pchs_2[clust2_result$cluster], frame = TRUE )
+
+# create legends
+legend(x="topright",inset=(c(-0.4,0)), y= "right", legend=c("CEEE-GT", "CELG G&T", "CEMIG-GT",  "CHESF", "COPEL-GT","CTEEP", "ELETRONORTE", "ELETROSUL","FURNAS", "STATE GRID_HOL", "TAESA_HOL", "TBE_HOL", "ALUPAR_HOL", "CELEO_HOL" ), fill=colors)
+legend(x="bottomright", inset=(c(-0.4,-0.3)), y= "right", legend = c("Cluster 1", "Cluster 2", "Cluster 3", "Cluster 4", "Cluster 5", "Cluster 6"), pch = pchs_2)
+
+# stop export 
+dev.off()
+
+# increase number of clusters
+k <- k +1
+}
+
+```
+## Chunk 6: Cluster tendency by Hopkins statistics (MDS 2D)
+```{r}
+require(hopkins)
+
+# set seed for random numbers 
+set.seed(123)
+
+# compute Hopkins statistic for the dataset of MDS 2D 
+hopkins <- hopkins(subset_mds2D, m = ceiling(nrow(subset_mds2D)/10))
+
+# export console Output 
+file <- file("C:\\Users\\Kira\\OneDrive\\Controlling Seminar\\Seminar Controlling\\Abbildungen\\Clustering\\kmeans_mds2D.txt") 
+sink(file, append = TRUE, type = "output")
+
+# print result (result is 1-hopkins statistic)
+print("cluster tendency by Hopkins statistic (result is 1-Hopkins statistic)")
+print(hopkins)
+
+#Calculated values 0-0.3 indicate regularly-spaced data. Values around 0.5 indicate random data. Values 0.7-1 indicate clustered data.
+
+# interpretation: given dataset is clusterable 
+
+```
+## Chunk 7: K-Means clustering - Determination of optimal number of clusters (MDS 2D)
+```{r}
+par(mfrow=c(1,2))
+
+require (NbClust)
+
+# determine optimal number of clusters 
+NbClust(data=subset_mds2D, distance = "euclidean", min.nc=2, max.nc=9, method="kmeans", index="all", alphaBeale = 0.1)
+
+
+# define number of clusters
+k <- 2
+
+```
+## Chunk 8: K-Means clustering (MDS 2D)
+```{r width =9}
+require(cluster)
+require(fpc)
+require(ggplot2)
+
+# set seed for random number generation 
+set.seed(123)
+  
+  #k-means clustering 
+clust2_result <- kmeans (subset_mds2D, k, nstart=25 )
+
+# print results 
+print(clust2_result)
+
+
+# plot results 
+library(cluster)
+
+#plotcluster(mds$points, clust_result$cluster, bw=TRUE, col = colors[df_mds$group_name], main= paste("kmeans Clustering (k = ", k, ", MDS 2D) ", sp="" )
+
+
+# space for the plot
+par(mfrow=c(1,1))
+# space for the legend 
+par(mar=c(5,5,5,15), xpd=TRUE)
+
+plot (x= subset_mds2D[,1],y =  subset_mds2D[,2], main= paste("kmeans Clustering (k = ", k,", MDS 2D)", sp="" ), xlab="Dim. 1", ylab = "Dim.2",  col= colors[df_mds$group_name], pch = pchs_2[clust2_result$cluster], frame = TRUE)
+
+legend(x="topright",inset=(c(-0.7,0)), y= "right", legend=c("CEEE-GT", "CELG G&T", "CEMIG-GT",  "CHESF", "COPEL-GT","CTEEP", "ELETRONORTE", "ELETROSUL","FURNAS", "STATE GRID_HOL", "TAESA_HOL", "TBE_HOL", "ALUPAR_HOL", "CELEO_HOL" ), fill=colors)
+legend(x="bottomright",inset=(c(-0.6,-0.7)), y= "right", legend=c("Cluster 1", "Cluster 2", "Cluster 3", "Cluster 4", "Cluster 5"), pch = pchs_2)
+
+```
+## Chunk 9: Cluster statistics for kmeans Clustering (MDS 2D)
+```{r}
+
+require(fpc)
+
+# compute distance based statistics 
+km_stats_2D <- cluster.stats(dist(subset_mds2D), clust2_result$cluster)
+km_stats_2D
+
+
+
+# interpretation: If the data set contains compact and well-separated clusters, the diameter of the clusters is expected to be small and the distance between the clusters is expected to be large. Thus, Dunn index should be maximized.
+```
+## Chunk 10: Cluster validation by silhouette analysis (MDS 2D)
+```{r}
+# read: http://www.sthda.com/english/wiki/wiki.php?id_contents=7952
+
+require(cluster)
+
+
+# silhouette coefficient of observation 
+sil <- silhouette(clust2_result$cluster, dist(subset_mds2D))
+print(sil)
+
+# interpretation: obversations with large S_i (near 1) are very well clustered; a small S_i (near 0) means the observation lies between two clusters; observations with a negative S_i are probably placed in the wrong cluster 
+
+# summary of silhouette analysis 
+si.sum <- summary(sil)
+print("silhouette analysis summary")
+print(si.sum)
+
+# stop console output export 
+sink()
+
+# define filename for plot
+filename <- paste("C:\\Users\\Kira\\OneDrive\\Controlling Seminar\\Seminar Controlling\\Abbildungen\\Clustering\\kmeans_mds2D_sil.png")
+
+# start export png
+png(filename=filename, width=960, height=480)
+
+#plot silhouette 
+plot(sil, main = "Silhouette plot kmeans Clustering (k=3, MDS 2D)")
+
+# stop export 
+dev.off()
+```
+
+## Chunk 11: Cluster tendency by Hopkins statistics (MDS 3D)
+```{r}
+require(hopkins)
+
+# set seed for random numbers 
+set.seed(123)
+
+# export console Output 
+file <- file("C:\\Users\\Kira\\OneDrive\\Controlling Seminar\\Seminar Controlling\\Abbildungen\\Clustering\\kmeans_mds3D.txt") 
+sink(file, append = TRUE, type = "output")
+
+# compute Hopkins statistic for the dataset of MDS 2D 
+hopkins <- hopkins(subset_mds3D, m = ceiling(nrow(subset_mds3D)/10))
+
+# print result (result is 1-hopkins statistic)
+print("Hopkins statistic (result is 1-Hopkins statistic")
+print(hopkins)
+
+#Calculated values 0-0.3 indicate regularly-spaced data. Values around 0.5 indicate random data. Values 0.7-1 indicate clustered data.
+
+# interpretation: given dataset is clusterable 
+
+```
+## Chunk 12: K-Means clustering - Determination of optimal number of clusters (MDS 3D)
+```{r}
+require (NbClust)
+
+# determine optimal number of clusters 
+NbClust(data=subset_mds3D, distance = "euclidean", min.nc=2, max.nc=9, method="kmeans", index="all", alphaBeale = 0.1)
+
+# define number of clusters
+k <- 4
+```
+## Chunk 13: K-Means clustering (MDS 3D)
+```{r width =9}
+require(cluster)
+require(scatterplot3d)
+
+
+# space for the plot
+par(mfrow=c(1,1))
+# space for the legend 
+par(mar=c(5,5,5,15), xpd=TRUE)
+
+# set seed for random number generation 
+set.seed(123)
+
+  #k-means clustering 
+clust3_result <- kmeans (subset_mds3D, k, nstart=25 )
+
+# print results 
+print(clust3_result)
+
+# test
+clust3_centers <- data.frame(clust3_result$centers)
+print(clust3_result$centers[1,])
+
+# plot results 
+# color according to company name 
+# pch according to cluster
+
+scatterplot3d(subset_mds3D[,1], subset_mds3D[,2], subset_mds3D[,3], xlab = "Dim. 1", ylab = "Dim. 2", zlab = "Dim. 3", color= colors[df_mds3$group_name] , main = paste("kmeans Clustering (k = ", k,", MDS 3D)", sp="" ), pch = pchs_2[clust3_result$cluster], grid = FALSE, angle=70)
+
+```
+## Chunk 14: Cluster statistics for kmeans Clustering (MDS 3D)
+```{r}
+
+require(fpc)
+
+# compute distance based statistics 
+km_stats_3D <- cluster.stats(dist(subset_mds3D), clust3_result$cluster)
+km_stats_3D
+
+# interpretation: If the data set contains compact and well-separated clusters, the diameter of the clusters is expected to be small and the distance between the clusters is expected to be large. Thus, Dunn index should be maximized.
+```
+## Chunk 15: Cluster validation by silhouette analysis (MDS 3D)
+```{r}
+
+require(cluster)
+
+# silhouette coefficient of observation 
+sil <- silhouette(clust3_result$cluster, dist(subset_mds3D))
+print(sil)
+
+# interpretation: obversations with large S_i (near 1) are very well clustered; a small S_i (near 0) means the observation lies between two clusters; observations with a negative S_i are probably placed in the wrong cluster 
+
+# summary of silhouette analysis 
+si.sum <- summary(sil)
+print("summary")
+print(si.sum)
+
+# stop export 
+sink()
+
+# define filename for plot
+filename <- paste("C:\\Users\\Kira\\OneDrive\\Controlling Seminar\\Seminar Controlling\\Abbildungen\\Clustering\\kmeans_mds3D_sil.png")
+
+# start export png
+png(filename=filename, width=960, height=480)
+
+#plot silhouette 
+plot(sil, main = "Silhouette plot kmeans Clustering (k=3, MDS 3D)")
+
+# stop export 
+dev.off()
+```
+
+## Chunk 16: Hierarchical clustering (MDS 2D)
+```{r fig.width= 9}
+
+
+# declaration of subset 
+z <- subset_mds2D
+
+# export console Output 
+file <- file("C:\\Users\\Kira\\OneDrive\\Controlling Seminar\\Seminar Controlling\\Abbildungen\\Clustering\\hclust_mds2D.txt") 
+sink(file, append = TRUE, type = "output")
+
+
+#Optimal Clusters
+NbClust(data=z, distance = "euclidean", min.nc=2, max.nc=9, method="ward.D", index="all", alphaBeale = 0.1)
+
+#calculate the euclidean distance
+distance <- dist(z)
+
+# optimal number of clusters 
+k <- 4
+
+#clustering dendogram
+hc.l <- hclust(distance)
+plot(hc.l, labels = mydata$company, hang = -1, cex = 0.01)
+rect.hclust(hc.l , k = k, border = 2:6)
+cut_avg_6 <- cutree(hc.l, k = k)
+
+#clustering dendogram 2
+require (factoextra)
+
+res.hc <- eclust(z, "hclust", k = k,
+                method = "complete", graph = TRUE) 
+head(res.hc$cluster, 15)
+
+suppressPackageStartupMessages(library(dplyr))
+seeds_df_cl_6 <- mutate(mydata[c(5:26)], cluster = cut_avg_6)
+count(seeds_df_cl_6,cluster)
+
+suppressPackageStartupMessages(library(ggplot2))
+dev.new(width=10, height=5, unit="cm")
+ggplot(seeds_df_cl_6, aes(x=mydata$OPEX, y = mydata$`Reactive.power.(Mvar)`, color = factor(cluster), label = mydata$company)) + geom_point(size = 0.05) + geom_text(hjust=0, vjust=0, size = 0.6)
+ggsave("Test1.pdf", width = 10, height = 8, units = c("cm"), dpi = 1200)
+
+#member.1 <- cutree(hc.l,5)
+#plot(member.1)
+#aggregate(z,list(member.1),mean)
+
+#suppressPackageStartupMessages(library(dendextend))
+#avg_dend_obj <- as.dendrogram(hc.l)
+#avg_col_dend <- color_branches(avg_dend_obj, h = 5)
+#plot(avg_col_dend)
+
+#Actual Values
+#aggregate(subset_mds2D,list(member.1),mean)
+
+require(fpc)
+
+# Statistics for hierarchical clustering
+hc_stats_2D <- cluster.stats(distance,  res.hc$cluster)
+hc_stats_2D
+
+# cluster validation by silhouette analysis 
+
+require(cluster)
+
+# silhouette coefficient of observation 
+sil <- silhouette(res.hc$cluster, dist(subset_mds2D))
+print(sil)
+
+# interpretation: obversations with large S_i (near 1) are very well clustered; a small S_i (near 0) means the observation lies between two clusters; observations with a negative S_i are probably placed in the wrong cluster 
+
+# summary of silhouette analysis 
+si.sum <- summary(sil)
+print("silhouette analysis summary")
+print(si.sum)
+
+# stop console output export 
+sink()
+
+#plot silhouette 
+plot(sil, main = "Silhouette plot kmeans Clustering (k=4, MDS 2D)")
+
+
+# alternative plot of clusters 
+
+# space for the plot
+par(mfrow=c(1,1))
+# space for the legend 
+par(mar=c(5,5,5,25), xpd=TRUE)
+
+plot.new()
+
+
+plot (x= subset_mds2D[,1],y =  subset_mds2D[,2], main= paste("Hierarchial clustering (k = ", k,", MDS 2D)", sp="" ), xlab="Dim. 1", ylab = "Dim.2",  col= colors[df_mds$group_name], pch = pchs_2[res.hc$cluster], frame = TRUE)
+
+legend(x="topright",inset=(c(-0.7,0)), y= "right", legend=c("CEEE-GT", "CELG G&T", "CEMIG-GT",  "CHESF", "COPEL-GT","CTEEP", "ELETRONORTE", "ELETROSUL","FURNAS", "STATE GRID_HOL", "TAESA_HOL", "TBE_HOL", "ALUPAR_HOL", "CELEO_HOL" ), fill=colors)
+legend(x="topright",inset=(c(-1.1,0)), y= "right", legend=c("Cluster 1", "Cluster 2", "Cluster 3", "Cluster 4", "Cluster 5"), pch = pchs_2)
+
+```
+## Chunk 17: Hierarchical clustering (MDS 3D)
+```{r fig.width=10}
+par(mfrow=c(1,1))
+
+#declaration of subset
+z <- subset_mds3D
+
+# export console Output 
+file <- file("C:\\Users\\Kira\\OneDrive\\Controlling Seminar\\Seminar Controlling\\Abbildungen\\Clustering\\hclust_mds3D.txt") 
+sink(file, append = TRUE, type = "output")
+
+
+#Optimal Clusters
+NbClust(data=z, distance = "euclidean", min.nc=2, max.nc=9, method="ward.D", index="all", alphaBeale = 0.1)
+
+#calculate the euclidean distance
+distance <- dist(z)
+
+# optimal number of clusters
+k <- 6
+
+#clustering dendogram
+hc.l <- hclust(distance)
+plot(hc.l, labels = mydata$company, hang = -1)
+rect.hclust(hc.l , k = k, border = 2:6)
+cut_avg_6 <- cutree(hc.l, k = k)
+
+#clustering dendogram 2
+res.hc <- eclust(z, "hclust", k = k,
+                method = "complete", graph = TRUE) 
+head(res.hc$cluster, 15)
+suppressPackageStartupMessages(library(dplyr))
+seeds_df_cl_6 <- mutate(mydata[c(5:26)], cluster = cut_avg_6)
+count(seeds_df_cl_6,cluster)
+
+suppressPackageStartupMessages(library(ggplot2))
+ggplot(seeds_df_cl_6, aes(x=mydata$OPEX, y = mydata$`Reactive.power.(Mvar)`, color = factor(cluster), label = mydata$company)) + geom_point() + geom_text(hjust=0, vjust=0, size = 1.5)
+
+#member.1 <- cutree(hc.l,3)
+#plot(member.1)
+#aggregate(z,list(member.1),mean)
+
+#suppressPackageStartupMessages(library(dendextend))
+#avg_dend_obj <- as.dendrogram(hc.l)
+#avg_col_dend <- color_branches(avg_dend_obj, h = 5)
+#plot(avg_col_dend)
+
+#Actual Values
+aggregate(subset_mds3D,list(member.1),mean)
+
+# Statistics for hierarchical clustering
+hc_stats_3D <- cluster.stats(distance,  res.hc$cluster)
+# (HCLUST) within clusters sum of squares
+hc_stats_3D
+
+# cluster validation by silhouette analysis 
+
+require(cluster)
+
+# silhouette coefficient of observation 
+sil <- silhouette(res.hc$cluster, dist(subset_mds3D))
+print(sil)
+
+# interpretation: obversations with large S_i (near 1) are very well clustered; a small S_i (near 0) means the observation lies between two clusters; observations with a negative S_i are probably placed in the wrong cluster 
+
+# summary of silhouette analysis 
+si.sum <- summary(sil)
+print("silhouette analysis summary")
+print(si.sum)
+
+# stop console output export 
+sink()
+
+#plot silhouette 
+plot.new()
+plot(sil, main = "Silhouette plot kmeans Clustering (k=6, MDS 3D)")
+
+
+```
+## Chunk 18: Hierarchical clustering (Non-MDS)
+```{r}
+mydata
+plot(OPEX~Age.of.assets, mydata)
+with(mydata,text(OPEX~Age.of.assets, labels = company, pos = 4, cex = .3))
+
+#declaration of subset
+z <- subset_norm
+
+# export console Output 
+file <- file("C:\\Users\\Kira\\OneDrive\\Controlling Seminar\\Seminar Controlling\\Abbildungen\\Clustering\\hclust6_non_mds.txt") 
+sink(file, append = TRUE, type = "output")
+
+#Optimal Clusters
+#NbClust(data=z, distance = "euclidean", min.nc=2, max.nc=9, method="ward.D", index="all", alphaBeale = 0.1)
+
+#calculate the euclidean distance
+distance <- dist(z)
+
+# number of clusters 
+k <- 6
+
+#clustering dendogram
+hc.l <- hclust(distance)
+plot(hc.l, labels = mydata$company, hang = -1)
+rect.hclust(hc.l , k = k, border = 2:6)
+cut_avg_6 <- cutree(hc.l, k = k)
+
+#clustering dendogram 2
+res.hc <- eclust(z, "hclust", k = k,
+                method = "complete", graph = TRUE) 
+head(res.hc$cluster, 15)
+
+suppressPackageStartupMessages(library(dplyr))
+seeds_df_cl_6 <- mutate(mydata[c(5:26)], cluster = cut_avg_6)
+count(seeds_df_cl_6,cluster)
+
+suppressPackageStartupMessages(library(ggplot2))
+ggplot(seeds_df_cl_6, aes(x=mydata$OPEX, y = mydata$`Reactive.power.(Mvar)`, color = factor(cluster), label = mydata$company)) + geom_point() + geom_text(hjust=0, vjust=0, size = 1.2)
+
+member.1 <- cutree(hc.l,3)
+plot(member.1)
+aggregate(z,list(member.1),mean)
+
+suppressPackageStartupMessages(library(dendextend))
+avg_dend_obj <- as.dendrogram(hc.l)
+avg_col_dend <- color_branches(avg_dend_obj, h = 3)
+plot(avg_col_dend)
+
+#Actual Values
+aggregate(mydata[c(5:26)],list(member.1),mean)
+
+require(fpc)
+
+# Statistics for hierarchical clustering
+hc_stats_Non <- cluster.stats(distance,  res.hc$cluster)
+hc_stats_Non
+# (HCLUST) within clusters sum of squares
+hc_stats_Non$within.cluster.ss
+
+# number of clusters 
+k <- 6
+
+#clustering dendogram
+hc.l <- hclust(distance)
+plot(hc.l, labels = mydata$company, hang = -1)
+rect.hclust(hc.l , k = k, border = 2:6)
+cut_avg_6 <- cutree(hc.l, k = k)
+
+#clustering dendogram 2
+res.hc <- eclust(z, "hclust", k = k,
+                method = "complete", graph = TRUE) 
+head(res.hc$cluster, 15)
+
+suppressPackageStartupMessages(library(dplyr))
+seeds_df_cl_6 <- mutate(mydata[c(5:26)], cluster = cut_avg_6)
+count(seeds_df_cl_6,cluster)
+
+suppressPackageStartupMessages(library(ggplot2))
+ggplot(seeds_df_cl_6, aes(x=mydata$OPEX, y = mydata$`Reactive.power.(Mvar)`, color = factor(cluster), label = mydata$company)) + geom_point() + geom_text(hjust=0, vjust=0, size = 1.2)
+
+member.1 <- cutree(hc.l,3)
+plot(member.1)
+aggregate(z,list(member.1),mean)
+
+suppressPackageStartupMessages(library(dendextend))
+avg_dend_obj <- as.dendrogram(hc.l)
+avg_col_dend <- color_branches(avg_dend_obj, h = 3)
+plot(avg_col_dend)
+
+#Actual Values
+aggregate(mydata[c(5:26)],list(member.1),mean)
+
+require(fpc)
+
+# Statistics for hierarchical clustering
+hc_stats_Non <- cluster.stats(distance,  res.hc$cluster)
+hc_stats_Non
+
+# stop console output export 
+sink()
+
+# (HCLUST) within clusters sum of squares
+hc_stats_Non$within.cluster.ss
+```
+

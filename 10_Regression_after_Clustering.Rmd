@@ -1,0 +1,1033 @@
+---
+title: "10_Regression_after_Clustering"
+output: html_document
+date: '2022-07-18'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+remotes::install_github("dmurdoch/rgl")
+## Data reading using package **openxlsx**
+```{r readingData}
+require(openxlsx)
+
+mydata  <- read.xlsx("Data - Seminar.xlsx", startRow=3)
+
+```
+# chunk 1: cluster subsets 
+```{r}
+
+require(magrittr)
+require(dplyr)
+
+# subset without artificially generated data for balanced plm 
+companies_raw <- c(-5,-6,-11,-12,-17,-18,-23,-24,-29,-30,-35,-36,-41,-42,-47,-48,-53, -54)
+mydata_balanced <- mydata[companies_raw, -1]
+
+# cluster 1: CEEE-GT, CEMIG-GT, CHESF, ELECTRONORTE, ALUPAR_HOL, TBE_HOL, CELG G&T, COPEL-GT 
+clust_1 <- mydata_balanced %>% filter(company %in% c("CEEE-GT", "CELG G&T", "CEMIG-GT", "CHESF", "COPEL-GT", "ELETRONORTE", "TBE_HOL", "ALUPAR_HOL" ))
+print(clust_1)
+
+# cluster 2: CTEEP
+clust_2 <-  mydata_balanced %>% filter(company == "CTEEP")
+print(clust_2)
+
+# cluster 3: ELETROSUL, STATE GRID_HOL, FURNAS
+clust_3 <- mydata_balanced %>% filter (company %in% c("ELETROSUL", "STATE GRID_HOL", "FURNAS"))
+print(clust_3)
+
+# cluster 4: TAESA_HOL 
+clust_4 <- mydata_balanced %>% filter(company == "TAESA_HOL")
+print(clust_4)
+
+```
+# chunk 2: cluster 1: linear regression: OPEX ~ outputs with feature selection
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+OLS <- lm (formula= clust_1$OPEX ~ clust_1$`Network.extension.<.230.kV` + clust_1$`Network.extension.≥.230.kV` + clust_1$`Number.of.power.transformers.and.reactors.<.230.kV` + clust_1$`Number.of.power.transformers.and.reactors.≥.230.kV` + clust_1$`Number.of.switch.modes.<.230.kV` + clust_1$`Number.of.switch.modes.≥.230.kV` + clust_1$`Transformation.capacity.(MVA)` + clust_1$`Reactive.power.(Mvar)` + clust_1$`Quality.variable:.Power.not.delivered`, data = clust_1)
+
+# Stepwise forward and backward selection
+OLS <- step(OLS,trace = 0, k = 2, direction = "both")
+
+
+summary(OLS)
+
+# print the calculated AIC of OLS 
+print("AIC")
+print(AIC(OLS, k=2))
+
+# OLS adjusted (decided by VIF) 
+OLS_adj <- lm(formula = clust_1$OPEX ~ clust_1$`Network.extension.<.230.kV` +        clust_1$`Number.of.switch.modes.<.230.kV` + clust_1$`Transformation.capacity.(MVA)` + 
+    clust_1$`Reactive.power.(Mvar)`, data = clust_1)
+
+summary (OLS_adj)
+
+# print residualplot of OLS
+residualPlot(OLS_adj)
+
+# model prediction
+yhat <- predict(OLS_adj)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$OPEX, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$OPEX, yhat)
+print("RMSE")
+print(RMSE)
+
+# Breusch-Pagan test for homoskedasticity 
+
+require(lmtest)
+
+BP <- bptest(OLS)
+
+print(BP)
+
+
+## Variance Inflation Factor Analysis
+# to check if the variables have correlation or not. For example, cons: 0.98. That mean 98% of "cons" can be explained by the other variables. So, we may exclude this variable if needed. When, "NTLaj" is 0.54, that means only 54% of this variable can be explained by the other variables.
+
+# OLS
+print(vif(OLS))
+print(1 - 1/vif(OLS))
+
+#OLS adj
+# OLS
+print(vif(OLS_adj))
+print(1 - 1/vif(OLS_adj))
+
+# cross validation 
+
+require(caret)
+set.seed(123)
+
+# cross validation 
+# Define training control
+ train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = clust_1[,c(4, 8, 10, 11)], y = clust_1[,3], method = "lm", trControl = train.control)
+ 
+ 
+# Summarize the results
+ print("cross validation")
+ summary(model)
+
+
+```
+# chunk 3: Cluster 3: linear regression OPEX ~ outputs with feature selection
+```{r}
+
+require(robustbase)
+require(car)
+require(stats)
+
+# OLs model 
+OLS <- lm (formula= clust_3$OPEX ~ clust_3$`Network.extension.<.230.kV` + clust_3$`Network.extension.≥.230.kV` + clust_3$`Number.of.power.transformers.and.reactors.<.230.kV` + clust_3$`Number.of.power.transformers.and.reactors.≥.230.kV` + clust_3$`Number.of.switch.modes.<.230.kV` + clust_3$`Number.of.switch.modes.≥.230.kV` + clust_3$`Transformation.capacity.(MVA)` + clust_3$`Reactive.power.(Mvar)` + clust_3$`Quality.variable:.Power.not.delivered`, data = clust_3)
+
+# Stepwise forward and backward selection
+OLS <- step(OLS,trace = 0, k = 2, direction = "both")
+  
+
+summary(OLS)
+
+# print the calculated AIC of OLS 
+print("AIC")
+print(AIC(OLS, k=2))
+
+# OLS adjusted (VIF)
+OLS_adj <- lm(formula = clust_3$OPEX ~ clust_3$`Network.extension.<.230.kV` +       clust_3$`Reactive.power.(Mvar)`,
+    data = clust_3)
+
+summary(OLS_adj)
+
+# print residualplot of OLS
+residualPlot(OLS)
+
+# model prediction
+yhat <- predict(OLS_adj)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$OPEX, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$OPEX, yhat)
+print("RMSE")
+print(RMSE)
+
+# Breusch-Pagan test for homoskedasticity
+
+require(lmtest)
+
+BP <- bptest(OLS)
+
+print(BP)
+
+
+## Variance Inflation Factor Analysis
+# to check if the variables have correlation or not. For example, cons: 0.98. That mean 98% of "cons" can be explained by the other variables. So, we may exclude this variable if needed. When, "NTLaj" is 0.54, that means only 54% of this variable can be explained by the other variables.
+
+# OLS
+print(vif(OLS))
+print(1 - 1/vif(OLS))
+
+# OLS_adj
+# OLS
+print(vif(OLS_adj))
+print(1 - 1/vif(OLS_adj))
+
+# cross validation 
+
+require(caret)
+set.seed(123)
+
+# cross validation 
+# Define training control
+ train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = clust_1[,c(4, 11)], y = clust_1[,3], method = "lm", trControl = train.control)
+ 
+ 
+# Summarize the results
+ print("Cross validation")
+ summary(model)
+
+```
+# chunk 4: Cluster 1: linear regression OPEX ~ environmental variables with feature selection 
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# OLS model 
+OLS <- lm (formula= clust_1$OPEX ~ clust_1$Age.of.assets + clust_1$`(Age.of.assets).square` + clust_1$Average.declivity + clust_1$Intersection.with.indigenous.areas + clust_1$Height.of.vegetation + clust_1$Percentage.of.high.vegetation +clust_1$Average.precipitation + clust_1$Network.density + clust_1$Fire.incidence + clust_1$Number.of.intersections.with.roads +clust_1$Coincidence.of.network.lines + clust_1$Density.of.lightening +clust_1$Number.of.access.to.roads, data = clust_1)
+
+# Stepwise forward and backward selection
+OLS <- step(OLS,trace = 0, k = 2, direction = "both")
+  
+
+summary(OLS)
+
+# print the calculated AIC of OLS 
+print("AIC")
+print(AIC(OLS, k=2))
+
+# print residualplot of OLS
+residualPlot(OLS)
+
+# model prediction
+yhat <- predict(OLS)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$OPEX, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$OPEX, yhat)
+print("RMSE")
+print(RMSE)
+
+# Breusch-Pagan test for homoskedasticity in a Linear Regression Model 
+
+require(lmtest)
+
+BP <- bptest(OLS)
+
+print(BP)
+
+## Variance Inflation Factor Analysis
+# to check if the variables have correlation or not. For example, cons: 0.98. That mean 98% of "cons" can be explained by the other variables. So, we may exclude this variable if needed. When, "NTLaj" is 0.54, that means only 54% of this variable can be explained by the other variables.
+
+# OLS
+print(vif(OLS))
+print(1 - 1/vif(OLS))
+
+
+# cross validation 
+
+# Define training control
+ train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = clust_1[,c(16, 17, 18, 19, 20)], y = clust_1[,3], method = "lm", trControl = train.control)
+ 
+ 
+# Summarize the results
+print("cross validation")
+ summary(model)
+
+
+```
+# chunk 5: Cluster 3: linear regression OPEX ~ environmental variables with feature selection 
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# OLS model 
+OLS <- lm (formula= clust_3$OPEX ~ clust_3$Age.of.assets + clust_3$`(Age.of.assets).square` + clust_3$Average.declivity + clust_3$Intersection.with.indigenous.areas + clust_3$Height.of.vegetation + clust_3$Percentage.of.high.vegetation +clust_3$Average.precipitation + clust_3$Network.density + clust_3$Fire.incidence + clust_3$Number.of.intersections.with.roads +clust_3$Coincidence.of.network.lines + clust_3$Density.of.lightening +clust_3$Number.of.access.to.roads, data = clust_3)
+
+# Stepwise forward and backward selection
+OLS <- step(OLS,trace = 0, k = 2, direction = "both")
+
+summary(OLS)
+
+# OLS_adj (VIF)
+OLS_adj <- lm(formula = clust_3$OPEX ~ clust_3$Average.declivity + clust_3$Intersection.with.indigenous.areas,
+    data = clust_3)
+
+# print the calculated AIC of OLS 
+print("AIC")
+print(AIC(OLS, k=2))
+
+# print residualplot of OLS
+residualPlot(OLS)
+
+# model prediction
+yhat <- predict(OLS)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$OPEX, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$OPEX, yhat)
+print("RMSE")
+print(RMSE)
+
+# Breusch-Pagan test for homoskedasticity 
+
+require(lmtest)
+
+BP <- bptest(OLS)
+
+print(BP)
+
+
+## Variance Inflation Factor Analysis
+# to check if the variables have correlation or not. For example, cons: 0.98. That mean 98% of "cons" can be explained by the other variables. So, we may exclude this variable if needed. When, "NTLaj" is 0.54, that means only 54% of this variable can be explained by the other variables.
+
+# OLS
+print(vif(OLS))
+print(1 - 1/vif(OLS))
+
+# OLS
+print(vif(OLS_adj))
+print(1 - 1/vif(OLS_adj))
+
+# cross validation 
+
+# Define training control
+ train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = clust_1[,c(14, 15, 16)], y = clust_1[,3], method = "lm", trControl = train.control)
+ 
+ 
+# Summarize the results
+print("cross validation")
+ summary(model)
+
+```
+# chunk 6: Cluster 1: linear regression efficiency without weight restrictions ~ environmental variables with feature selection 
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# linear regression model with feature selection 
+OLS <-lm(formula= clust_1$Efficiency.without.Weight.restrictions ~ clust_1$Age.of.assets + clust_1$`(Age.of.assets).square` +clust_1$Average.declivity + clust_1$Intersection.with.indigenous.areas + clust_1$Height.of.vegetation + clust_1$Percentage.of.high.vegetation +clust_1$Average.precipitation +clust_1$Network.density + clust_1$Fire.incidence + clust_1$Number.of.intersections.with.roads + clust_1$Coincidence.of.network.lines + clust_1$Density.of.lightening + clust_1$Number.of.access.to.roads, data = clust_1)
+
+# feature selection
+OLS <- step(OLS, direction = "both", k=2, trace = 0)
+
+# summary and residual plot 
+print(summary(OLS))
+
+# residual plot 
+residualPlot(OLS)
+
+# model prediction
+yhat <- predict(OLS)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("RMSE")
+print(RMSE)
+
+# cross validation 
+
+# Define training control
+ train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = clust_1[,c(13, 15, 17, 18, 19, 20, 21)], y = clust_1[,27], method = "lm", trControl = train.control)
+ 
+ 
+# Summarize the results
+print("cross validation")
+ summary(model)
+
+
+```
+# chunk 7: Cluster 1: polynomial regression efficiency without weight restrictions ~ environmental variables with feature selection (degree 2)
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# define degree 
+degree <- 2
+  
+  # polynomial regression model with feature selection 
+poly_2 <- lm(formula= (clust_1$Efficiency.without.Weight.restrictions ~ poly(clust_1$Age.of.assets, degree) + poly(clust_1$Average.declivity, degree) + poly(clust_1$Intersection.with.indigenous.areas, degree) + poly(clust_1$Height.of.vegetation, degree) + poly(clust_1$Percentage.of.high.vegetation, degree) + poly(clust_1$Average.precipitation, degree) + poly(clust_1$Network.density, degree) + poly(clust_1$Fire.incidence, degree) + poly(clust_1$Number.of.intersections.with.roads, degree) + poly(clust_1$Coincidence.of.network.lines, degree) + poly(clust_1$Density.of.lightening, degree) + poly(clust_1$Number.of.access.to.roads, degree)), data = clust_1)
+
+# feature selection
+poly_2 <- step(poly_2, direction = "both", k=2, trace = 0)
+
+# summary and residual plot 
+print(summary(poly_2))
+
+# residual plot 
+residualPlot(poly_2)
+
+# model prediction
+yhat <- predict(poly_2)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("RMSE")
+print(RMSE)
+
+# cross validation 
+
+require(caret)
+set.seed(123)
+
+# define degree
+degree <- 2
+
+# Define training control
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = data.frame(poly(clust_1[, 13], degree), poly(clust_1[, 16], degree), poly(clust_1[,17],degree), poly(clust_1[, 18],degree)), y= clust_1[,27], method = "lm", trControl = train.control)
+
+ 
+# Summarize the results
+ print("cross validation")
+ summary(model)
+
+```
+# chunk 8: Cluster 1: polynomial regression efficiency without weight restrictions ~ environmental variables with feature selection (degree 3)
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# define degree 
+degree <- 3
+  
+  # polynomial regression model with feature selection 
+poly_3 <- lm(formula= (clust_1$Efficiency.without.Weight.restrictions ~ poly(clust_1$Age.of.assets, degree) + poly(clust_1$Average.declivity, degree) + poly(clust_1$Intersection.with.indigenous.areas, degree) + poly(clust_1$Height.of.vegetation, degree) + poly(clust_1$Percentage.of.high.vegetation, degree) + poly(clust_1$Average.precipitation, degree) + poly(clust_1$Network.density, degree) + poly(clust_1$Fire.incidence, degree) + poly(clust_1$Number.of.intersections.with.roads, degree) + poly(clust_1$Coincidence.of.network.lines, degree) + poly(clust_1$Density.of.lightening, degree) + poly(clust_1$Number.of.access.to.roads, degree)), data = clust_1)
+
+# feature selection
+poly_3 <- step(poly_3, direction = "both", k=2, trace = 0)
+
+# summary and residual plot 
+print(summary(poly_3))
+
+# residual plot 
+residualPlot(poly_3)
+
+# model prediction
+yhat <- predict(poly_3)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("RMSE")
+print(RMSE)
+
+# cross validation 
+
+require(caret)
+set.seed(123)
+
+# define degree
+degree <- 3
+
+# Define training control
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = data.frame(poly(clust_1[, 13], degree), poly(clust_1[, 15], degree), poly(clust_1[,17],degree)), y= clust_1[,27], method = "lm", trControl = train.control)
+
+ 
+# Summarize the results
+ print("cross validation")
+ summary(model)
+
+```
+# chunk 9: Cluster 1: polynomial regression efficiency without weight restrictions ~ environmental variables with feature selection (degree 4)
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# define degree 
+degree <- 4
+  
+  # polynomial regression model with feature selection 
+poly_4 <- lm(formula= (clust_1$Efficiency.without.Weight.restrictions ~ poly(clust_1$Age.of.assets, degree) + poly(clust_1$Average.declivity, degree) + poly(clust_1$Intersection.with.indigenous.areas, degree) + poly(clust_1$Height.of.vegetation, degree) + poly(clust_1$Percentage.of.high.vegetation, degree) + poly(clust_1$Average.precipitation, degree) + poly(clust_1$Network.density, degree) + poly(clust_1$Fire.incidence, degree) + poly(clust_1$Number.of.intersections.with.roads, degree) + poly(clust_1$Coincidence.of.network.lines, degree) + poly(clust_1$Density.of.lightening, degree) + poly(clust_1$Number.of.access.to.roads, degree)), data = clust_1)
+
+# feature selection
+poly_4 <- step(poly_4, direction = "both", k=2, trace = 0)
+
+# summary and residual plot 
+print(summary(poly_4))
+
+# residual plot 
+residualPlot(poly_4)
+
+# model prediction
+yhat <- predict(poly_4)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("RMSE")
+print(RMSE)
+
+# cross validation 
+
+require(caret)
+set.seed(123)
+
+# define degree
+degree <- 4
+
+# Define training control
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = data.frame(poly(clust_1[, 13], degree), poly(clust_1[, 15], degree), poly(clust_1[,16],degree)), y= clust_1[,27], method = "lm", trControl = train.control)
+
+ 
+# Summarize the results
+ print("cross validation")
+ summary(model)
+
+
+```
+# chunk 10: Cluster 1: polynomial regression efficiency without weight restrictions ~ environmental variables with feature selection (degree 5)
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# define degree 
+degree <- 5
+  
+  # polynomial regression model with feature selection 
+poly_5 <- lm(formula= (clust_1$Efficiency.without.Weight.restrictions ~ poly(clust_1$Age.of.assets, degree) + poly(clust_1$Average.declivity, degree) + poly(clust_1$Intersection.with.indigenous.areas, degree) + poly(clust_1$Height.of.vegetation, degree) + poly(clust_1$Percentage.of.high.vegetation, degree) + poly(clust_1$Average.precipitation, degree) + poly(clust_1$Network.density, degree) + poly(clust_1$Fire.incidence, degree) + poly(clust_1$Number.of.intersections.with.roads, degree) + poly(clust_1$Coincidence.of.network.lines, degree) + poly(clust_1$Density.of.lightening, degree) + poly(clust_1$Number.of.access.to.roads, degree)), data = clust_1)
+
+# feature selection
+poly_5 <- step(poly_5, direction = "both", k=2, trace = 0)
+
+# summary and residual plot 
+print(summary(poly_5))
+
+# residual plot 
+residualPlot(poly_5)
+
+# model prediction
+yhat <- predict(poly_5)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("RMSE")
+print(RMSE)
+
+# cross validation 
+
+require(caret)
+set.seed(123)
+
+# define degree
+degree <- 5
+
+# Define training control
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = data.frame(poly(clust_1[, 13], degree), poly(clust_1[, 15], degree), poly(clust_1[,16],degree)), y= clust_1[,27], method = "lm", trControl = train.control)
+
+ 
+# Summarize the results
+ print("cross validation")
+ summary(model)
+
+
+```
+# chunk 11: Cluster 3: linear regression efficiency without weight restrictions ~ environmental variables with feature selection 
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# linear regression model with feature selection 
+OLS <-lm(formula= clust_3$Efficiency.without.Weight.restrictions ~ clust_3$Age.of.assets + clust_3$`(Age.of.assets).square` +clust_3$Average.declivity + clust_3$Intersection.with.indigenous.areas + clust_3$Height.of.vegetation + clust_3$Percentage.of.high.vegetation +clust_3$Average.precipitation +clust_3$Network.density + clust_3$Fire.incidence + clust_3$Number.of.intersections.with.roads + clust_3$Coincidence.of.network.lines + clust_3$Density.of.lightening + clust_3$Number.of.access.to.roads, data = clust_3)
+
+# feature selection
+OLS <- step(OLS, direction = "both", k=2, trace = 0)
+
+# summary and residual plot 
+print(summary(OLS))
+
+# residual plot 
+residualPlot(OLS)
+
+# model prediction
+yhat <- predict(OLS)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("RMSE")
+print(RMSE)
+
+
+# cross validation 
+
+require(caret)
+set.seed(123)
+
+# Define training control
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = clust_3[,c(13, 15, 16)], y = clust_3[,27], method = "lm", trControl = train.control)
+
+ 
+# Summarize the results
+ print("cross validation")
+ summary(model)
+
+```
+# chunk 12: Cluster 3: polynomial regression efficiency without weight restrictions ~ environmental variables with feature selection (degree 2)
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# define degree 
+degree <- 2
+  
+  # polynomial regression model with feature selection 
+poly_2 <- lm(formula= (clust_3$Efficiency.without.Weight.restrictions ~ poly(clust_3$Age.of.assets, degree) + poly(clust_3$Average.declivity, degree) + poly(clust_3$Intersection.with.indigenous.areas, degree) + poly(clust_3$Height.of.vegetation, degree) + poly(clust_3$Percentage.of.high.vegetation, degree) + poly(clust_3$Average.precipitation, degree) + poly(clust_3$Network.density, degree) + poly(clust_3$Fire.incidence, degree) + poly(clust_3$Number.of.intersections.with.roads, degree) + poly(clust_3$Coincidence.of.network.lines, degree) + poly(clust_3$Density.of.lightening, degree) + poly(clust_3$Number.of.access.to.roads, degree)), data = clust_3)
+
+# feature selection
+poly_2 <- step(poly_2, direction = "both", k=2, trace = 0)
+
+# summary and residual plot 
+print(summary(poly_2))
+
+# residual plot 
+residualPlot(poly_2)
+
+# model prediction
+yhat <- predict(poly_2)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("RMSE")
+print(RMSE)
+
+# cross validation 
+
+require(caret)
+set.seed(123)
+
+# Define training control
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = data.frame(poly(clust_3[, 13], degree), poly(clust_3[, 15], degree)), y = clust_3[,27], method = "lm", trControl = train.control)
+
+ 
+# Summarize the results
+ print("cross validation")
+ summary(model)
+
+# stop: Error in poly(clust_3$Average.declivity, degree) : 
+#'degree' muss kleiner sein, als die Zahl der verschiedenen Punkte
+```
+
+# chunk 13: Cluster 1: polynomial regression efficiency with weight restrictions ~ environmental variables with feature selection (degree 2)
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# define degree 
+degree <- 2
+  
+  # polynomial regression model with feature selection 
+poly_2 <- lm(formula= (clust_1$Efficiency.with.Weight.restrictions ~ poly(clust_1$Age.of.assets, degree) + poly(clust_1$Average.declivity, degree) + poly(clust_1$Intersection.with.indigenous.areas, degree) + poly(clust_1$Height.of.vegetation, degree) + poly(clust_1$Percentage.of.high.vegetation, degree) + poly(clust_1$Average.precipitation, degree) + poly(clust_1$Network.density, degree) + poly(clust_1$Fire.incidence, degree) + poly(clust_1$Number.of.intersections.with.roads, degree) + poly(clust_1$Coincidence.of.network.lines, degree) + poly(clust_1$Density.of.lightening, degree) + poly(clust_1$Number.of.access.to.roads, degree)), data = clust_1)
+
+# feature selection
+poly_2 <- step(poly_2, direction = "both", k=2, trace = 0)
+
+# summary and residual plot 
+print(summary(poly_2))
+
+# residual plot 
+residualPlot(poly_2)
+
+# model prediction
+yhat <- predict(poly_2)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("RMSE")
+print(RMSE)
+
+# cross validation 
+
+require(caret)
+set.seed(123)
+
+# Define training control
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = data.frame(poly(clust_1[, 13], degree), poly(clust_1[, 15], degree), poly(clust_1[, 16], degree), poly(clust_1[, 17], degree), poly(clust_1[, 18], degree)), y = clust_1[,26], method = "lm", trControl = train.control)
+
+ 
+# Summarize the results
+ print("cross validation")
+ summary(model)
+
+```
+# chunk 14: Cluster 1: polynomial regression efficiency with weight restrictions ~ environmental variables with feature selection (degree 3)
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# define degree 
+degree <- 3
+  
+  # polynomial regression model with feature selection 
+poly_3 <- lm(formula= (clust_1$Efficiency.with.Weight.restrictions ~ poly(clust_1$Age.of.assets, degree) + poly(clust_1$Average.declivity, degree) + poly(clust_1$Intersection.with.indigenous.areas, degree) + poly(clust_1$Height.of.vegetation, degree) + poly(clust_1$Percentage.of.high.vegetation, degree) + poly(clust_1$Average.precipitation, degree) + poly(clust_1$Network.density, degree) + poly(clust_1$Fire.incidence, degree) + poly(clust_1$Number.of.intersections.with.roads, degree) + poly(clust_1$Coincidence.of.network.lines, degree) + poly(clust_1$Density.of.lightening, degree) + poly(clust_1$Number.of.access.to.roads, degree)), data = clust_1)
+
+# feature selection
+poly_3 <- step(poly_3, direction = "both", k=2, trace = 0)
+
+# summary and residual plot 
+print(summary(poly_3))
+
+# residual plot 
+residualPlot(poly_3)
+
+# model prediction
+yhat <- predict(poly_3)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("RMSE")
+print(RMSE)
+
+# cross validation 
+
+require(caret)
+set.seed(123)
+
+# Define training control
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = data.frame(poly(clust_1[, 13], degree), poly(clust_1[, 15], degree), poly(clust_1[, 16], degree), poly(clust_1[, 17], degree)), y = clust_1[,26], method = "lm", trControl = train.control)
+
+ 
+# Summarize the results
+ print("cross validation")
+ summary(model)
+```
+# chunk 15: Cluster 1: polynomial regression efficiency with weight restrictions ~ environmental variables with feature selection (degree 4)
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# define degree 
+degree <- 4
+  
+  # polynomial regression model with feature selection 
+poly_4 <- lm(formula= (clust_1$Efficiency.with.Weight.restrictions ~ poly(clust_1$Age.of.assets, degree) + poly(clust_1$Average.declivity, degree) + poly(clust_1$Intersection.with.indigenous.areas, degree) + poly(clust_1$Height.of.vegetation, degree) + poly(clust_1$Percentage.of.high.vegetation, degree) + poly(clust_1$Average.precipitation, degree) + poly(clust_1$Network.density, degree) + poly(clust_1$Fire.incidence, degree) + poly(clust_1$Number.of.intersections.with.roads, degree) + poly(clust_1$Coincidence.of.network.lines, degree) + poly(clust_1$Density.of.lightening, degree) + poly(clust_1$Number.of.access.to.roads, degree)), data = clust_1)
+
+# feature selection
+poly_4 <- step(poly_4, direction = "both", k=2, trace = 0)
+
+# summary and residual plot 
+print(summary(poly_4))
+
+# residual plot 
+residualPlot(poly_4)
+
+# model prediction
+yhat <- predict(poly_4)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("RMSE")
+print(RMSE)
+
+# cross validation 
+
+require(caret)
+set.seed(123)
+
+# Define training control
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = data.frame(poly(clust_1[, 13], degree), poly(clust_1[, 15], degree), poly(clust_1[, 16], degree)), y = clust_1[,26], method = "lm", trControl = train.control)
+
+ 
+# Summarize the results
+ print("cross validation")
+ summary(model)
+
+```
+# chunk 16: Cluster 1: polynomial regression efficiency with weight restrictions ~ environmental variables with feature selection (degree 5)
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# define degree 
+degree <- 5
+  
+  # polynomial regression model with feature selection 
+poly_5 <- lm(formula= (clust_1$Efficiency.with.Weight.restrictions ~ poly(clust_1$Age.of.assets, degree) + poly(clust_1$Average.declivity, degree) + poly(clust_1$Intersection.with.indigenous.areas, degree) + poly(clust_1$Height.of.vegetation, degree) + poly(clust_1$Percentage.of.high.vegetation, degree) + poly(clust_1$Average.precipitation, degree) + poly(clust_1$Network.density, degree) + poly(clust_1$Fire.incidence, degree) + poly(clust_1$Number.of.intersections.with.roads, degree) + poly(clust_1$Coincidence.of.network.lines, degree) + poly(clust_1$Density.of.lightening, degree) + poly(clust_1$Number.of.access.to.roads, degree)), data = clust_1)
+
+# feature selection
+poly_5 <- step(poly_5, direction = "both", k=2, trace = 0)
+
+# summary and residual plot 
+print(summary(poly_5))
+
+# residual plot 
+residualPlot(poly_5)
+
+# model prediction
+yhat <- predict(poly_5)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("RMSE")
+print(RMSE)
+
+# cross validation 
+
+require(caret)
+set.seed(123)
+
+# Define training control
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = data.frame(poly(clust_1[, 13], degree), poly(clust_1[, 15], degree), poly(clust_1[, 16], degree)), y = clust_1[,26], method = "lm", trControl = train.control)
+
+ 
+# Summarize the results
+ print("cross validation")
+ summary(model)
+
+```
+# chunk 17: Cluster 3: linear regression efficiency with weight restrictions ~ environmental variables with feature selection 
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# linear regression model with feature selection 
+OLS <-lm(formula= clust_3$Efficiency.with.Weight.restrictions ~ clust_3$Age.of.assets + clust_3$`(Age.of.assets).square` +clust_3$Average.declivity + clust_3$Intersection.with.indigenous.areas + clust_3$Height.of.vegetation + clust_3$Percentage.of.high.vegetation +clust_3$Average.precipitation +clust_3$Network.density + clust_3$Fire.incidence + clust_3$Number.of.intersections.with.roads + clust_3$Coincidence.of.network.lines + clust_3$Density.of.lightening + clust_3$Number.of.access.to.roads, data = clust_3)
+
+# feature selection
+OLS <- step(OLS, direction = "both", k=2, trace = 0)
+
+# summary and residual plot 
+print(summary(OLS))
+
+# residual plot 
+residualPlot(OLS)
+
+# model prediction
+yhat <- predict(OLS)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("RMSE")
+print(RMSE)
+
+# cross validation 
+
+require(caret)
+set.seed(123)
+
+# Define training control
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = clust_3[c(13, 15, 16)], y = clust_3[,26], method = "lm", trControl = train.control)
+
+ 
+# Summarize the results
+ print("cross validation")
+ summary(model)
+
+```
+# chunk 18: Cluster 3: polynomial regression efficiency with weight restrictions ~ environmental variables with feature selection (degree 2)
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# define degree 
+degree <- 2
+  
+  # polynomial regression model with feature selection 
+poly_2 <- lm(formula= (clust_3$Efficiency.with.Weight.restrictions ~ poly(clust_3$Age.of.assets, degree) + poly(clust_3$Average.declivity, degree) + poly(clust_3$Intersection.with.indigenous.areas, degree) + poly(clust_3$Height.of.vegetation, degree) + poly(clust_3$Percentage.of.high.vegetation, degree) + poly(clust_3$Average.precipitation, degree) + poly(clust_3$Network.density, degree) + poly(clust_3$Fire.incidence, degree) + poly(clust_3$Number.of.intersections.with.roads, degree) + poly(clust_3$Coincidence.of.network.lines, degree) + poly(clust_3$Density.of.lightening, degree) + poly(clust_3$Number.of.access.to.roads, degree)), data = clust_3)
+
+# feature selection
+poly_2 <- step(poly_2, direction = "both", k=2, trace = 0)
+
+# summary and residual plot 
+print(summary(poly_2))
+
+# residual plot 
+residualPlot(poly_2)
+
+# model prediction
+yhat <- predict(poly_2)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$Efficiency.without.Weight.restrictions, yhat)
+print("RMSE")
+print(RMSE)
+
+# cross validation 
+
+require(caret)
+set.seed(123)
+
+# Define training control
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = data.frame(poly(clust_3[, 13], degree), poly(clust_3[, 15], degree)), y = clust_3[,26], method = "lm", trControl = train.control)
+
+ 
+# Summarize the results
+ print("cross validation")
+ summary(model)
+
+# stop: Error in poly(clust_3$Average.declivity, degree) : 
+ # 'degree' muss kleiner sein, als die Zahl der verschiedenen Punkte
+
+```
+
+

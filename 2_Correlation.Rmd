@@ -1,0 +1,154 @@
+---
+title: "2_Correlation"
+output: html_document
+date: '2022-05-18'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+##  Data reading using package **openxlsx**
+```{r readingData}
+require(openxlsx)
+ mydata  <- read.xlsx("Data - Seminar.xlsx", startRow=3)
+
+```
+
+## Chunk 1: Correlation spearman and pearson 
+```{r GraphsBasics, fig.width=30}
+ require(corrplot)
+ require(Hmisc)
+ require(PerformanceAnalytics)
+
+# subset of all internal and external variables 
+subset <- mydata[, 4:28]
+
+# spearman correlation matrix 
+MatCor_spearman <- rcorr(as.matrix(subset), type="spearman")
+
+# pearson correlation matrix 
+MatCor_pearson <- rcorr(as.matrix(subset), type="pearson")
+
+# print correlation matrices
+
+# export console Output 
+file <- file("correlation_matrix_spearman.txt") 
+sink(file, append = TRUE, type = "output")
+
+# print correlation matrix
+print("Spearson correlation coefficient matrix")
+print(MatCor_spearman)
+
+# stop export 
+sink()
+
+# export console Output 
+file <- file("correlation_matrix_pearson.txt") 
+sink(file, append = TRUE, type = "output")
+
+# print correlation matrix 
+print ("Pearson correlation matrix")
+print(MatCor_pearson)
+
+# stop export 
+sink()
+ 
+# plot graphics 
+#filename export png 
+filename <- "correlation_graph_spearman.png"
+# start export png
+png(filename=filename, width=960, height=960)
+
+# plot the correlation matrix
+corrplot(MatCor_spearman$r, type="upper", order="original", diag = FALSE, tl.col = "black", tl.srt = 45 )
+
+# stop export 
+dev.off()
+
+#filename export png 
+filename <- "correlation_graph_spearman_sig.png"
+# start export png
+png(filename=filename, width=960, height=960)
+  
+# plot the correlation matrix,  insignificant correlations are leaved blank
+corrplot(MatCor_spearman$r, type="upper", order="original", diag = FALSE, tl.col = "black", tl.srt = 45, p.mat = MatCor_spearman$P, sig.level = 0.05, insig = "blank")
+
+# stop export 
+dev.off()
+
+#filename export png 
+filename <- "correlation_graph_pearson.png"
+# start export png
+png(filename=filename, width=960, height=960)
+
+# plot the correlation matrix,  insignificant correlations are leaved blank
+corrplot(MatCor_pearson$r, type="upper", order="original", diag = FALSE, tl.col = "black", tl.srt = 45)
+
+# stop export 
+dev.off()
+
+#filename export png 
+filename <- "correlation_graph_pearson_sig.png"
+# start export png
+png(filename=filename, width=960, height=960)
+
+# plot the correlation matrix,  insignificant correlations are leaved blank
+corrplot(MatCor_pearson$r, type="upper", order="original", diag = FALSE, tl.col = "black", tl.srt = 45, p.mat = MatCor_pearson$P, sig.level = 0.05, insig = "blank")
+
+# stop export 
+dev.off()
+```
+## Chunk 2: Partial correlation spearman
+```{r fig.width=30}
+#package
+require(ppcor)
+
+# subset  from OPEX to Efficiency without weight restrictions 
+subset <- mydata[, 4:28]
+
+
+# partial correlation matrix  
+MatpCor_spearman <- pcor (subset, method= "spearman")
+
+# name columns and rows of the correlation matrix after the featurenames 
+featurenames <- colnames(mydata)[4:28]
+rownames(MatpCor_spearman$estimate) <- featurenames 
+colnames(MatpCor_spearman$estimate) <- featurenames 
+rownames(MatpCor_spearman$p.value) <- featurenames 
+colnames(MatpCor_spearman$p.value) <- featurenames 
+rownames(MatpCor_spearman$statistic) <- featurenames 
+colnames(MatpCor_spearman$statistic) <- featurenames 
+
+# export console Output 
+file <- file("pcorrelation_matrix_spearman.txt") 
+sink(file, append = TRUE, type = "output")
+
+#print spearman correlation coefficient matrix 
+print(MatpCor_spearman)
+
+# stop export console output
+sink()
+
+#filename export png 
+filename <- "pcorrelation_graph_spearman.png"
+# start export png
+png(filename=filename, width=960, height=960)
+
+#print the correlation matrix 
+corrplot(MatpCor_spearman$estimate, type="upper", order="original", diag = FALSE, tl.col = "black", tl.srt = 45.)
+
+#stop export png 
+dev.off()
+
+#filename export png 
+filename <- "pcorrelation_graph_spearman_sig.png"
+# start export png
+png(filename=filename, width=960, height=960)
+
+#print the correlation matrix,  insignificant correlations are leaved blank
+corrplot(MatpCor_spearman$estimate, type="upper", order="original", diag = FALSE, tl.col = "black", tl.srt = 45, p.mat = MatpCor_spearman$p.value, sig.level = 0.05, insig = "blank")
+
+#stop export png 
+dev.off()
+
+```

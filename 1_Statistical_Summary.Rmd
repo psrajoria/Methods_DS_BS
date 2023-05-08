@@ -1,0 +1,436 @@
+---
+title: "1_Statistical Summary"
+output: html_document
+date: "2022-05-18"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data reading using package **openxlsx**
+
+```{r readingData}
+require(openxlsx)
+ mydata  <- read.xlsx("Data - Seminar.xlsx", startRow=3)
+```
+
+## Chunk 1: Visualization of OPEX & efficiency of all companies over the years
+
+```{r GraphsBasics, fig.width=8}
+# Data preparation
+library("tidyverse")
+df <-  mydata %>% select(year, company,OPEX, Efficiency.with.Weight.restrictions, Efficiency.without.Weight.restrictions) %>% slice(1:4, 7:10, 13:16, 19:22, 25:28, 31:34, 37:40, 43:46, 49:52, 55:74)
+yearly_counts <- df %>% count(year, company, OPEX, Efficiency.with.Weight.restrictions, Efficiency.without.Weight.restrictions)
+
+# Visualization of OPEX of all companies over the years
+ggplot(data = yearly_counts, aes(x = year, y = OPEX, color = company)) +
+  geom_line(size = 1.0) +
+  scale_y_continuous(labels = scales::comma) + ylab("OPEX [$]") + xlab("Year") +
+    theme(axis.title.y = element_text(size = 15, angle = 90, face = "bold")) +
+  theme(axis.title.x = element_text(size = 15, face = "bold")) +
+  theme(legend.title = element_text(size = 15, face="bold")) +
+  theme(legend.text = element_text(size = 12))
+
+  ##Pankaj Rajoria - 25.11.2022
+  # theme(axis.title.y = element_text(size = 9, angle = 90, face = "bold")) +
+  # theme(axis.title.x = element_text(size = 9, face = "bold")) +
+  # theme(legend.title = element_text(size = 9, face="bold")) +
+  # theme(legend.text = element_text(size = 9)) +
+  # theme(axis.text = element_text(size = 9, face="bold")) +
+  # theme(legend.key.size = unit(2, 'cm'), #change legend key size
+  #       legend.key.height = unit(1, 'cm'), #change legend key height
+  #       legend.key.width = unit(1, 'cm'), #change legend key width
+  #       legend.title = element_text(face = "bold", size=9), #change legend title font size
+  #       legend.text = element_text(size=9))
+
+# Visualization of Efficiency.with.Weight.restrictions of all companies over the years
+ggplot(data = yearly_counts, aes(x = year, y = Efficiency.with.Weight.restrictions, color = company)) +
+  geom_line(size = 1.3) + scale_y_continuous(labels = scales::comma) +
+  ylab("Efficiency with Weight restrictions") +
+  xlab("Year") + theme(axis.title.y = element_text(size = 9, angle = 90, face = "bold")) +
+  theme(axis.title.y = element_text(size = 15, angle = 90, face = "bold")) +
+  theme(axis.title.x = element_text(size = 15, face = "bold")) +
+  theme(legend.title = element_text(size = 15, face="bold")) +
+  theme(legend.text = element_text(size = 12))
+
+  ##Pankaj Rajoria - 25.11.2022
+  # theme(axis.title.x = element_text(size = 9, face = "bold")) +
+  # theme(legend.title = element_text(size = 9, face="bold")) +
+  # theme(legend.text = element_text(size = 9)) +
+  # theme(axis.title.x = element_text(size = 9, face = "bold")) +
+  # theme(legend.title = element_text(size = 9, face="bold")) +
+  # theme(legend.text = element_text(size = 9))+
+  # theme(axis.text = element_text(size = 9, face="bold")) +
+  # theme(legend.key.size = unit(2, 'cm'), #change legend key size
+  #       legend.key.height = unit(1, 'cm'), #change legend key height
+  #       legend.key.width = unit(1, 'cm'), #change legend key width
+  #       legend.title = element_text(face = "bold", size=9), #change legend title font size
+  #       legend.text = element_text(size=9))
+
+# Visualization of Efficiency.without.Weight.restrictions of all companies over the years
+ggplot(data = yearly_counts, aes(x = year, y = Efficiency.without.Weight.restrictions, color = company)) +
+  geom_line(size = 1.0) + scale_y_continuous(labels = scales::comma) +
+  ylab("Efficiency without Weight restrictions") +
+  xlab("Year") + theme(axis.title.y = element_text(size = 9, angle = 90, face = "bold")) +
+  theme(axis.title.y = element_text(size = 15, angle = 90, face = "bold")) +
+  theme(axis.title.x = element_text(size = 15, face = "bold")) +
+  theme(legend.title = element_text(size = 15, face="bold")) +
+  theme(legend.text = element_text(size = 12))
+  # theme(axis.title.x = element_text(size = 9, face = "bold")) +
+  # theme(legend.title = element_text(size = 9, face="bold")) +
+  # theme(legend.text = element_text(size = 9)) +
+  # theme(axis.title.x = element_text(size = 9, face = "bold")) +
+  # theme(legend.title = element_text(size = 9, face="bold")) +
+  # theme(legend.text = element_text(size = 9))+
+  # theme(axis.text = element_text(size = 9, face="bold")) +
+  # theme(legend.key.size = unit(2, 'cm'), #change legend key size
+  #       legend.key.height = unit(1, 'cm'), #change legend key height
+  #       legend.key.width = unit(1, 'cm'), #change legend key width
+  #       legend.title = element_text(face = "bold", size=6), #change legend title font size
+  #       legend.text = element_text(size=9))
+
+# Visualization of OPEX of all companies over the years with explicit marked companies
+ggplot(data = yearly_counts, aes(x = OPEX, y = out, color = company), fill = "transparent") + ####Need to replace the variable y out with something else.
+  geom_point(size = 1.7) + scale_y_continuous(labels = scales::comma) +
+  ylab("Output") +
+  xlab("OPEX [$]") +
+  theme(axis.title.y = element_text(size = 15, angle = 90, face = "bold")) +
+  theme(axis.title.x = element_text(size = 15, face = "bold")) +
+  theme(legend.title = element_text(size = 15, face="bold")) +
+  theme(legend.text = element_text(size = 12))
+```
+
+## Chunk 2: Statistical summary for every attribute
+
+```{r GraphsBasics, fig.width=8}
+# Data preparation
+library("tidyverse")
+library("ggplot2")
+library(ggpubr)
+library("egg")
+
+# library("ggsave")
+df_2 <- mydata %>%
+  select(company:Efficiency.without.Weight.restrictions) %>% slice(1:4, 7:10, 13:16, 19:22, 25:28, 31:34, 37:40, 43:46, 49:52, 55:74)
+  # dplyr::select(company:OPEX) %>% slice(1:4, 7:10, 13:16, 19:22, 25:28, 31:34, 37:40, 43:46, 49:52, 55:74)
+yearly_counts_2 <- df_2 %>% count(OPEX, company, year)
+df_2
+
+# Statistical summary for every attribute
+n <- 27
+for(i in 3:n){
+out <- df_2[, c(i)]
+summary(df_2[, c(i)]) # Summary of the statistical data
+var(df_2[, c(i)]) ## variance
+sd(df_2[, c(i)]) ## standard deviation
+data_summary <- round(summary(df_2[, c(i)]), digits = 2)
+data_summary$Var <- round(var(df_2[, c(i)]), digits = 2)
+data_summary$Sd <- round(sd(df_2[, c(i)]), digits = 2)
+
+abc <- unlist(data_summary)
+p_final <- ggtexttable(abc)
+# abc <- lapply(data_summary, unlist)
+# main_data <- as.data.frame(abc, stringsAsFactors = F)
+# str(abc)
+
+# p_final <- as.table(main_data)
+# ggtexttable(main_data)
+
+# first.step <- lapply(data_summary, unlist) 
+# second.step <- as.data.frame(first.step, stringsAsFactors = F)
+# rqtq <- ggtexttable(df, rows = NULL)
+
+# Auto-Saving of the plots
+# dev.off()
+filename_Histo <- paste(colnames(df_2[i]), "SUMMARY",".png", sep = "")
+# filename_Histo <- paste(yearly_counts2, "SUMMARY",".png", sep = "")
+ggsave(device = "png", filename = filename_Histo, dpi = 400)
+
+# png(filename=filename_Histo, width=960, height=960)
+# ggsave(device = "png", filename = filename_Histo, width = 480, height = 480, units = "px")
+# width = 480, height = 480, units = "px"
+}
+```
+
+## Chunk 3: Plot of histogram & boxplot for every attribute
+
+```{r GraphsBasics, fig.width=8}
+# Data preparation
+library("tidyverse")
+library("ggplot2")
+library("egg")
+df_2 <- mydata %>%
+  dplyr:: select(company:Efficiency.without.Weight.restrictions) %>% slice(1:4, 7:10, 13:16, 19:22, 25:28, 31:34, 37:40, 43:46, 49:52, 55:74)
+yearly_counts_2 <- df_2 %>% count(OPEX, company, year)
+df_2
+
+# df_2 <- mydata %>%
+#   select(company:Efficiency.without.Weight.restrictions) %>% slice(1:4, 7:10, 13:16, 19:22, 25:28, 31:34, 37:40, 43:46, 49:52, 55:74)
+# yearly_counts_2 <- df_2 %>% count(OPEX, company, year)
+# df_2
+
+# Histogram & Boxplot for every attribute
+n <- 27
+for(i in 3:n){
+out <- df_2[, c(i)]
+p_1 <- ggplot(data = yearly_counts_2, aes(x = out, color = company)) + geom_histogram(aes(y =..density..),
+                 col="black",
+                 fill="red",
+                 alpha=.2) +
+  geom_density(col="black", size = 1.5, linetype = "solid") +
+  labs(x=colnames(df_2[i]), y="Count") +
+  scale_y_continuous(labels = scales::comma) +
+  scale_x_continuous(labels = scales::comma) +
+  theme(axis.title.y = element_text(size = 24, angle = 90, face = "bold")) +
+  theme(axis.title.x = element_text(size = 24, face = "bold")) +
+  theme(axis.text = element_text(color="black", face = "bold", size=15))
+
+p_2 <- ggplot(data = yearly_counts_2, aes(x = out, color = company)) +
+  geom_boxplot( col="black",
+                 fill="red",
+                 alpha=.2) +
+  theme_classic() + scale_y_continuous(labels = scales::comma) + scale_x_continuous(labels = scales::comma) + labs(x=colnames(df_2[i])) +
+  theme(axis.title.x = element_text(size = 24, face = "bold")) +
+  theme(axis.text.y=element_blank(), axis.ticks.y=element_blank()) +
+  theme(axis.text = element_text(color="black", face = "bold", size=15))
+
+p_final <- egg::ggarrange(p_1, p_2, heights = 2:1)
+#p_final <- ggarrange(p_1, p_2,
+         #ncol = 1, nrow = 3,
+         #heights = c(1, 0.5))
+p_final
+
+# Auto-Saving of the plots
+# filename_Histo <- paste(colnames(df_2[i]), ".png", sep = "")
+#ggsave(device = "png", filename = filename_Histo, dpi = 400)
+png(file= "filename_Histo1.png",
+width=1920, height=1080)
+print(p_final)
+dev.off()
+}
+```
+
+## Chunk 4: Scatter plots of the outputs and enviromental variables
+
+```{r GraphsBasics, fig.width=8}
+# Data preparation
+library("tidyverse")
+library("ggplot2")
+df_3 <- mydata %>%
+ dplyr:: select(company:Efficiency.without.Weight.restrictions) %>% slice(1:4, 7:10, 13:16, 19:22, 25:28, 31:34, 37:40, 43:46, 49:52, 55:74)
+yearly_counts_3 <- df_3 %>% count(OPEX, company, year, Efficiency.with.Weight.restrictions, Efficiency.without.Weight.restrictions)
+df_3
+
+
+
+# Scatter Plot for the outputs
+n <- 4
+for(i in n:25){
+out_2 <- df_3[, c(i)]
+p <- ggplot(data = yearly_counts_3, aes(x = out_2, y = OPEX, color = company)) + geom_point(size = 2.1) + scale_y_continuous(labels = scales::comma) + ylab(colnames(df_3[i])) + xlab("OPEX [$]") + theme(axis.title.y = element_text(size = 15, angle = 90, face = "bold")) + theme(axis.title.x = element_text(size = 15, face = "bold")) + theme(legend.title = element_text(size = 15, face="bold")) + theme(legend.text = element_text(size = 12))
+
+# Auto-Saving of the plots
+filename_Plot <- paste(colnames(df_3[i]), " Plott.png", sep = "")
+ggsave(device = "png", filename = filename_Plot, dpi = 400)
+}
+
+# Scatter Plot for the enviromental variables
+n <- 13
+for(i in n:25){
+out_3 <- df_3[, c(i)]
+p <- ggplot(data = yearly_counts_3, aes(x = out_3, y = Efficiency.with.Weight.restrictions, color = company)) + geom_point(size = 2.1) + scale_y_continuous(labels = scales::comma) + ylab(colnames(df_3[i])) + xlab("Efficiency.with.Weight.restrictions") + theme(axis.title.y = element_text(size = 15, angle = 90, face = "bold")) + theme(axis.title.x = element_text(size = 15, face = "bold")) + theme(legend.title = element_text(size = 15, face="bold")) + theme(legend.text = element_text(size = 12))
+
+filename_Plot <- paste(colnames(df_3[i]), " Plott.png", sep = "")
+ggsave(device = "png", filename = filename_Plot, dpi = 400)
+}
+```
+
+## Chunk 5: Boxplots for Regression-Chapter
+
+```{r GraphsBasics, fig.width=8}
+# Data preperation
+df_kira <- mydata %>% dplyr::select(OPEX, Efficiency.with.Weight.restrictions, Efficiency.without.Weight.restrictions)
+
+for (i in 1:3) {
+  out <- df_kira[, c(i)]
+
+  # Plot of regression Boxplots
+  p_kira <- ggplot(data = df_kira, aes(x = out, color = company)) +
+  geom_boxplot( col="black", width=0.7, fill="red", alpha=.2) +
+  coord_flip() +
+  theme_classic() +
+  scale_y_continuous(labels = scales::comma) +
+  scale_x_continuous(labels = scales::comma) +
+  labs(x=colnames(df_kira[i])) +
+  theme(axis.title.x = element_text(size = 20, face = "bold")) +
+  ylab("") +
+  theme(axis.title.y = element_text(size = 20, face = "bold")) +
+  theme(axis.text = element_text(face="bold")) +
+  theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())
+
+print(p_kira)
+filename_Histo <- paste(colnames(df_kira[i]), "KIRA",".png", sep = "")
+ggsave(device = "png", filename = filename_Histo, width = 5, height = 10,dpi = 300)
+}
+```
+
+## Chunk 6: Illustration of the relation between the OPEX and outputs/environmental variables
+
+```{r GraphsBasics, fig.width=9}
+# index of columns, start with Output 1
+index <- 5
+
+# go through all columns from Output 1 to Efficiency without weight restrictions
+for (index in 5:28){
+
+filename <- colnames(mydata)[index]
+filename <- gsub("<", "lt", filename)
+filename <- gsub(":", "", filename)
+filename <- paste("OPEX_vs_",filename,".png", sep="")
+
+# start export png
+png(filename=filename, width=960, height=480)
+
+# space for the plot
+par(mfrow=c(1,1))
+# space for the legend
+par(mar=c(6,6,6,12), xpd=TRUE)
+
+# package
+require(car)
+
+# subsets without artificially generated data and holdings
+# OPEX subset
+OPEX_subset <- mydata$OPEX[TSOs]
+# outputs and environmental variables subsets
+variable_subset <- mydata[,index][TSOs]
+
+# declaration of x and y
+x <- OPEX_subset
+y <- variable_subset
+
+# create dataframe for grouping by company name and year
+df <- data.frame(x = x, y = y, group_name = factor(group), group_20XX=factor(group_year))
+
+# plot and color by group and shape by year
+plot(df$x, df$y, main =  paste("OPEX vs.", colnames(mydata)[index]), xlab = "OPEX", ylab= colnames(mydata)[index], col = colors[df$group_name], pch = pchs[df$group_20XX], cex = 2, frame = TRUE)
+
+# create legends
+legend(x="topright",inset=(c(-0.22,0)), y= "right", legend=c("CEEE-GT", "CELG G&T", "CEMIG-GT",  "CHESF", "COPEL-GT","CTEEP", "ELETRONORTE", "ELETROSUL","FURNAS", "STATE GRID_HOL", "TAESA_HOL", "TBE_HOL", "ALUPAR_HOL", "CELEO_HOL" ), fill=colors)
+
+legend(x="bottomright", inset=(c(-0.22,0)), y= "right", legend = c("2013", "2014", "2015", "2016"), pch = pchs)
+
+# stop export png
+dev.off()
+
+# increase index
+index <- index+1
+}
+```
+
+## Chunk 7: Illustration of the relation between each output/environmental variable and the efficiency without weight restrictions
+
+```{r GraphsBasics, fig.width=9}
+# index of columns, start with Output 1
+index <- 5
+
+# go through all columns from Output 1 to Environmental Variable 13
+for (index in 5:26){
+
+filename <- colnames(mydata)[index]
+filename <- gsub("<", "lt", filename)
+filename <- gsub(":", "", filename)
+filename <- paste("C:\\Users\\Kira\\OneDrive\\Controlling Seminar\\Seminar Controlling\\Abbildungen\\output_environmental variables_vs_efficiency_without_wr\\Efficiency_wo_vs_",filename,".png", sep="")
+
+# start export png
+png(filename=filename, width=960, height=480)
+
+# space for the plot
+par(mfrow=c(1,1))
+# space for the legend
+par(mar=c(6,6,6,12), xpd=TRUE)
+
+# package
+require(car)
+
+# subsets without artificially generated data and holdings
+# Efficiency subset
+efficiency_subset <- mydata$Efficiency.without.Weight.restrictions[TSOs]
+# outputs and environmental variables subsets
+variable_subset <- mydata[,index][TSOs]
+
+# declaration of x and y
+x <- variable_subset
+y <- efficiency_subset
+
+# create dataframe for grouping by company name and year
+df <- data.frame(x = x, y = y, group_name = factor(group), group_20XX=factor(group_year))
+
+# plot and color by group and shape by year
+plot(df$x, df$y, main =  paste(colnames(mydata)[index], "vs. Efficiency without weight restrictions"), xlab = colnames(mydata)[index], ylab= "Efficiency without weight restrictions" , col = colors[df$group_name], pch = pchs[df$group_20XX], cex = 2,frame = TRUE)
+
+# create legends
+legend(x="topright",inset=(c(-0.22,0)), y= "right", legend=c("CEEE-GT", "CELG G&T", "CEMIG-GT",  "CHESF", "COPEL-GT","CTEEP", "ELETRONORTE", "ELETROSUL","FURNAS", "STATE GRID_HOL", "TAESA_HOL", "TBE_HOL", "ALUPAR_HOL", "CELEO_HOL" ), fill=colors)
+legend(x="bottomright", inset=(c(-0.22,0)), y= "right", legend = c("2013", "2014", "2015", "2016"), pch = pchs)
+
+# stop export png
+dev.off()
+
+# increase index
+index <- index+1
+}
+```
+
+## Chhunk 8: Illustration of the relation between each output/environmental variable and the efficiency with weight restrictions
+
+```{r GraphsBasics, fig.width=9}
+# index of columns, start with Output 1
+index <- 5
+
+# go through all columns from Output 1 to Environmental Variable 13
+for (index in 5:26){
+
+filename <- colnames(mydata)[index]
+filename <- gsub("<", "lt", filename)
+filename <- gsub(":", "", filename)
+filename <- paste("C:\\Users\\Kira\\OneDrive\\Controlling Seminar\\Seminar Controlling\\Abbildungen\\output_environmental variables_vs_efficiency_with_wr\\Efficiency_w_vs_",filename,".png", sep="")
+
+# start export png
+png(filename=filename, width=960, height=480)
+
+# space for the plot
+par(mfrow=c(1,1))
+# space for the legend
+par(mar=c(6,6,6,12), xpd=TRUE)
+
+# package
+require(car)
+
+# subsets without artificially generated data and holdings
+# Efficiency subset
+efficiency_subset <- mydata$Efficiency.with.Weight.restrictions[TSOs]
+# outputs and environmental variables subsets
+variable_subset <- mydata[,index][TSOs]
+
+# declaration of x and y
+x <- variable_subset
+y <- efficiency_subset
+
+# create dataframe for grouping by company name and year
+df <- data.frame(x = x, y = y, group_name = factor(group), group_20XX=factor(group_year))
+
+# plot and color by group and shape by year
+plot(df$x, df$y, main =  paste(colnames(mydata)[index], "vs. Efficiency with weight restrictions"), xlab = colnames(mydata)[index], ylab= "Efficiency with weight restrictions" , col = colors[df$group_name], pch = pchs[df$group_20XX], cex = 2,frame = TRUE)
+
+# create legends
+legend(x="topright",inset=(c(-0.22,0)), y= "right", legend=c("CEEE-GT", "CELG G&T", "CEMIG-GT",  "CHESF", "COPEL-GT","CTEEP", "ELETRONORTE", "ELETROSUL","FURNAS", "STATE GRID_HOL", "TAESA_HOL", "TBE_HOL", "ALUPAR_HOL", "CELEO_HOL" ), fill=colors)
+legend(x="bottomright", inset=(c(-0.22,0)), y= "right", legend = c("2013", "2014", "2015", "2016"), pch = pchs)
+
+# stop export png
+dev.off()
+
+# increase index
+index <- index+1
+}
+```

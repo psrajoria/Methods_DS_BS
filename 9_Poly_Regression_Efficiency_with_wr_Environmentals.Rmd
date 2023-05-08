@@ -1,0 +1,321 @@
+---
+title: "9_Poly_Regression_Efficiency_with_wr_Environmentals"
+output: html_document
+date: '2022-07-18'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data reading using package **openxlsx**
+```{r readingData}
+require(openxlsx)
+ mydata  <- read.xlsx("Data - Seminar.xlsx", startRow=3)
+
+```
+## chunk 1: Polynomial Regression model: efficiency with weight restrictions ~ environmental variables (identification of costdrivers/location factors)
+```{r}
+# Pearson and Spearman correlation coefficients show weak significant correlation 
+# partial correlation analysis seems to indicate weak direct correlations 
+# scatterplots show that a linear regression might not be suitable 
+```
+## chunk 2: definition of subset 
+```{r}
+# subset without artificially generated data for balanced plm 
+companies_raw <- c(-5,-6,-11,-12,-17,-18,-23,-24,-29,-30,-35,-36,-41,-42,-47,-48,-53, -54)
+mydata_balanced <- mydata[companies_raw, -1]
+
+```
+## chunk 3: polynomial regression model: efficiency with weight restrictions ~ environmental variables 
+
+```{r}
+
+require(robustbase)
+require(car)
+require(stats)
+
+
+# regression model with degree 2 to 6
+
+# define degree 
+degree <- 2
+
+# go through loop with increasing degree
+for (degree in 2:6){
+  
+  # polynomial regression model with feature selection 
+poly <- lm(formula= mydata_balanced$Efficiency.with.Weight.restrictions ~ poly(mydata_balanced$Age.of.assets, degree) + poly(mydata_balanced$Average.declivity, degree) + poly(mydata_balanced$Intersection.with.indigenous.areas, degree) + poly(mydata_balanced$Height.of.vegetation, degree) + poly(mydata_balanced$Percentage.of.high.vegetation, degree) + poly(mydata_balanced$Average.precipitation, degree) + poly(mydata_balanced$Network.density, degree) + poly(mydata_balanced$Fire.incidence, degree) + poly(mydata_balanced$Number.of.intersections.with.roads, degree) + poly(mydata_balanced$Coincidence.of.network.lines,degree) + poly(mydata_balanced$Density.of.lightening,degree) + poly(mydata_balanced$Number.of.access.to.roads, degree), data = mydata_balanced)
+
+# feature selection
+poly <- step(poly, direction = "both", k=2, trace = 0)
+
+# export console Output 
+file <- file(paste("C:\\Users\\Kira\\OneDrive\\Controlling Seminar\\Seminar Controlling\\Abbildungen\\polynomial_regression_efficiency_with_wr_environmental_variables\\Summary_poly", degree, ".txt", sep=""))
+sink(file, type = "output")
+
+# summary and residual plot 
+print(summary(poly))
+
+# stop export 
+sink()
+
+# define filename for plot
+filename <- paste("C:\\Users\\Kira\\OneDrive\\Controlling Seminar\\Seminar Controlling\\Abbildungen\\polynomial_regression_efficiency_with_wr_environmental_variables\\residualplot_", degree,".png", sep="")
+
+# start export png
+png(filename=filename, width=960, height=480)
+
+# residual plot 
+residualPlot(poly)
+
+# stop export 
+dev.off()
+
+}
+
+```
+# chunk 4: polynomial regression degree 2 with feature selection
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# define degree 
+degree <- 2
+  
+  # polynomial regression model with feature selection 
+poly_2 <- lm(formula= mydata_balanced$Efficiency.with.Weight.restrictions ~ poly(mydata_balanced$Age.of.assets, degree) + poly(mydata_balanced$Average.declivity, degree) + poly(mydata_balanced$Intersection.with.indigenous.areas, degree) +  poly(mydata_balanced$Percentage.of.high.vegetation, degree) + poly(mydata_balanced$Average.precipitation, degree) + poly(mydata_balanced$Network.density, degree) + poly(mydata_balanced$Fire.incidence, degree) + poly(mydata_balanced$Number.of.intersections.with.roads, degree) + poly(mydata_balanced$Coincidence.of.network.lines,degree) + poly(mydata_balanced$Density.of.lightening,degree) + poly(mydata_balanced$Number.of.access.to.roads, degree), data = mydata_balanced)
+
+# feature selection
+poly_2 <- step(poly_2, direction = "both", k=2, trace = 0)
+
+# summary and residual plot 
+print(summary(poly_2))
+
+# residual plot 
+residualPlot(poly_2)
+
+# model prediction
+yhat <- predict(poly_2)
+
+# compute MSE and RMSE 
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$Efficiency.with.Weight.restrictions, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$Efficiency.with.Weight.restrictions, yhat)
+print("RMSE")
+print(RMSE)
+
+# Breusch-Pagan-Test 
+require(lmtest)
+
+BP <- bptest(poly_2)
+
+print(BP)
+
+# Durbin-Watson Test
+
+dwtest(formula = mydata_balanced$Efficiency.with.Weight.restrictions ~ 
+    poly(mydata_balanced$Age.of.assets, degree) + poly(mydata_balanced$Average.declivity, 
+        degree) + poly(mydata_balanced$Intersection.with.indigenous.areas, 
+        degree) + poly(mydata_balanced$Percentage.of.high.vegetation, 
+        degree) + poly(mydata_balanced$Average.precipitation, 
+        degree) + poly(mydata_balanced$Network.density, degree) + 
+        poly(mydata_balanced$Fire.incidence, degree) + poly(mydata_balanced$Number.of.intersections.with.roads, 
+        degree), data = mydata_balanced)
+```
+# chunk 5:  cross validation poly_2
+```{r}
+
+
+require(caret)
+set.seed(123)
+
+# define degree
+degree <- 2
+
+# Define training control
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = data.frame(poly(mydata_balanced[, 13], degree), poly(mydata_balanced[, 15], degree), poly(mydata_balanced[, 16], degree), poly(mydata_balanced[, 18], degree), poly(mydata_balanced[, 19], degree), poly(mydata_balanced[, 20], degree), poly(mydata_balanced[, 21], degree), poly(mydata_balanced[, 22], degree)), y= mydata_balanced[,26], method = "lm", trControl = train.control)
+
+ 
+# Summarize the results
+ summary(model)
+```
+# chunk 6:  polynomial regression degree 3 with feature selection
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# define degree 
+degree <- 3
+  
+  # polynomial regression model with feature selection 
+poly_3 <- lm(formula= mydata_balanced$Efficiency.with.Weight.restrictions ~ poly(mydata_balanced$Age.of.assets, degree) + poly(mydata_balanced$Average.declivity, degree) + poly(mydata_balanced$Intersection.with.indigenous.areas, degree) + poly(mydata_balanced$Height.of.vegetation, degree) + poly(mydata_balanced$Percentage.of.high.vegetation, degree) + poly(mydata_balanced$Average.precipitation, degree) + poly(mydata_balanced$Network.density, degree) + poly(mydata_balanced$Fire.incidence, degree) + poly(mydata_balanced$Number.of.intersections.with.roads, degree) + poly(mydata_balanced$Coincidence.of.network.lines,degree) + poly(mydata_balanced$Density.of.lightening,degree) + poly(mydata_balanced$Number.of.access.to.roads, degree), data = mydata_balanced)
+
+# feature selection
+poly_3 <- step(poly_3, direction = "both", k=2, trace = 0)
+
+# summary and residual plot 
+print(summary(poly_3))
+
+# residual plot 
+residualPlot(poly_3)
+
+# model prediction
+yhat <- predict(poly_3)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$Efficiency.with.Weight.restrictions, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$Efficiency.with.Weight.restrictions, yhat)
+print("RMSE")
+print(RMSE)
+
+```
+# chunk 7: cross validation poly_3
+```{r}
+
+
+require(caret)
+set.seed(123)
+
+# define degree
+degree <- 3
+
+# Define training control
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = data.frame(poly(mydata_balanced[, 13], degree), poly(mydata_balanced[, 15], degree), poly(mydata_balanced[,16],degree), poly(mydata_balanced[, 17],degree), poly(mydata_balanced[, 19],degree)), y= mydata_balanced[,27], method = "lm", trControl = train.control)
+
+ 
+# Summarize the results
+ summary(model)
+```
+# chunk 8:  polynomial regression degree 4 with feature selection
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# define degree 
+degree <- 4
+  
+  # polynomial regression model with feature selection 
+poly_4 <- lm(formula= mydata_balanced$Efficiency.with.Weight.restrictions ~ poly(mydata_balanced$Age.of.assets, degree) + poly(mydata_balanced$Average.declivity, degree) + poly(mydata_balanced$Intersection.with.indigenous.areas, degree) + poly(mydata_balanced$Height.of.vegetation, degree) + poly(mydata_balanced$Percentage.of.high.vegetation, degree) + poly(mydata_balanced$Average.precipitation, degree) + poly(mydata_balanced$Network.density, degree) + poly(mydata_balanced$Fire.incidence, degree) + poly(mydata_balanced$Number.of.intersections.with.roads, degree) + poly(mydata_balanced$Coincidence.of.network.lines,degree) + poly(mydata_balanced$Density.of.lightening,degree) + poly(mydata_balanced$Number.of.access.to.roads, degree), data = mydata_balanced)
+
+# feature selection
+poly_4 <- step(poly_4, direction = "both", k=2, trace = 0)
+
+# summary and residual plot 
+print(summary(poly_4))
+
+# residual plot 
+residualPlot(poly_4)
+
+# model prediction
+yhat <- predict(poly_4)
+
+# compute MSE 
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$Efficiency.with.Weight.restrictions, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$Efficiency.with.Weight.restrictions, yhat)
+print("RMSE")
+print(RMSE)
+
+```
+# chunk 9: cross validation poly_4
+```{r}
+
+
+require(caret)
+set.seed(123)
+
+# define degree
+degree <- 4
+
+# Define training control
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = data.frame(poly(mydata_balanced[, 13], degree), poly(mydata_balanced[, 15], degree), poly(mydata_balanced[,16],degree), poly(mydata_balanced[, 18],degree)), y= mydata_balanced[,27], method = "lm", trControl = train.control)
+
+ 
+# Summarize the results
+ summary(model)
+```
+# chunk 10: polynomial regression degree 5 with feature selection
+```{r}
+require(robustbase)
+require(car)
+require(stats)
+
+# define degree 
+degree <- 5
+  
+  # polynomial regression model with feature selection 
+poly_5 <- lm(formula= mydata_balanced$Efficiency.with.Weight.restrictions ~ poly(mydata_balanced$Age.of.assets, degree) + poly(mydata_balanced$Average.declivity, degree) + poly(mydata_balanced$Intersection.with.indigenous.areas, degree) + poly(mydata_balanced$Height.of.vegetation, degree) + poly(mydata_balanced$Percentage.of.high.vegetation, degree) + poly(mydata_balanced$Average.precipitation, degree) + poly(mydata_balanced$Network.density, degree) + poly(mydata_balanced$Fire.incidence, degree) + poly(mydata_balanced$Number.of.intersections.with.roads, degree) + poly(mydata_balanced$Coincidence.of.network.lines,degree) + poly(mydata_balanced$Density.of.lightening,degree) + poly(mydata_balanced$Number.of.access.to.roads, degree), data = mydata_balanced)
+
+# feature selection
+poly_5 <- step(poly_5, direction = "both", k=2, trace = 0)
+
+# summary and residual plot 
+print(summary(poly_5))
+
+# residual plot 
+residualPlot(poly_5)
+
+# model prediction
+yhat <- predict(poly_5)
+
+# compute MSE and RMSE
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$Efficiency.with.Weight.restrictions, yhat)
+print("MSE")
+print(MSE)
+
+RMSE <- rmse(mydata_balanced$Efficiency.with.Weight.restrictions, yhat)
+print("RMSE")
+print(RMSE)
+
+```
+# chunk 11:  cross validation poly_5
+```{r}
+
+
+require(caret)
+set.seed(123)
+
+# define degree
+degree <- 5
+
+# Define training control
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+ model <- train(x = data.frame(poly(mydata_balanced[, 13], degree), poly(mydata_balanced[, 15], degree), poly(mydata_balanced[,16],degree), poly(mydata_balanced[, 17],degree)), y= mydata_balanced[,27], method = "lm", trControl = train.control)
+
+ 
+# Summarize the results
+ summary(model)
+ 
+ # Warning in predict.lm(modelFit, newdata) :
+ # Vorhersage durch Fit ohne vollen Rang mag täuschen
+```

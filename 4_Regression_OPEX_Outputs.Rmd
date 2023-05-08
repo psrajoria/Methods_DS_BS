@@ -1,0 +1,493 @@
+---
+title: "4_Regression_OPEX_Outputs"
+output: html_document
+date: '2022-07-18'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data reading using package **openxlsx**
+```{r readingData}
+require(openxlsx)
+ mydata  <- read.xlsx("Data - Seminar.xlsx", startRow=3)
+
+```
+## chunk 1: Linear Regression model: OPEX ~ Outputs (identification of Costdrivers)
+```{r}
+# Pearson and Spearman correlation coefficients show strong positive correlation
+# partial correlation analysis seems to indicate no direct correlations 
+# scatterplots show that a linear regression might be suitable 
+```
+## chunk 2: definition of subset 
+```{r}
+# subset without artificially generated data for balanced plm 
+companies_raw <- c(-5,-6,-11,-12,-17,-18,-23,-24,-29,-30,-35,-36,-41,-42,-47,-48,-53, -54)
+mydata_balanced <- mydata[companies_raw, -1]
+
+```
+## chunk 3: OLS model: OPEX ~ outputs
+
+```{r}
+require (robustbase)
+require(car)
+
+OLS <-lm(formula= mydata_balanced$OPEX ~ mydata_balanced$`Network.extension.<.230.kV` + mydata_balanced$`Network.extension.≥.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.<.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + mydata_balanced$`Number.of.switch.modes.<.230.kV` + mydata_balanced$`Number.of.switch.modes.≥.230.kV` + mydata_balanced$`Transformation.capacity.(MVA)` + mydata_balanced$`Reactive.power.(Mvar)` + mydata_balanced$`Quality.variable:.Power.not.delivered`, data = mydata_balanced)
+
+summary(OLS)
+
+## Variance Inflation Factor Analysis
+# to check if the variables have correlation or not. For example, cons: 0.98. That mean 98% of "cons" can be explained by the other variables. So, we may exclude this variable if needed. When, "NTLaj" is 0.54, that means only 54% of this variable can be explained by the other variables.
+
+print(vif(OLS))
+print(1 - 1/vif(OLS))
+
+# if VIF is higher than 1/(1-R_squared), where R_squared is the multiple R_squared, then the predictor is more related to other predictors than to the response 
+print("1/(1-R_squared)")
+print(1/(1-0.9654))
+
+# print residualplot of OLC 
+residualPlot(OLS)
+
+```
+## chunk 4: OLS model: OPEX ~ outputs with feature selection 
+```{r}
+require(robustbase)
+require(car)
+OLS <- lm (formula= mydata_balanced$OPEX ~ mydata_balanced$`Network.extension.<.230.kV` + mydata_balanced$`Network.extension.≥.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.<.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + mydata_balanced$`Number.of.switch.modes.<.230.kV` + mydata_balanced$`Number.of.switch.modes.≥.230.kV` + mydata_balanced$`Transformation.capacity.(MVA)` + mydata_balanced$`Reactive.power.(Mvar)` + mydata_balanced$`Quality.variable:.Power.not.delivered`, data = mydata_balanced)
+
+# Stepwise forward and backward selection
+OLS <- step(OLS,trace = 0, k = 2, direction = "both")
+
+summary(OLS)
+
+# print the calculated AIC of OLS 
+print("AIC")
+print(AIC(OLS, k=2))
+
+
+# OLS after feature selection adjusted according to VIF
+
+OLS_adj <- lm(formula = mydata_balanced$OPEX ~ mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + 
+    mydata_balanced$`Number.of.switch.modes.<.230.kV` + 
+    mydata_balanced$`Reactive.power.(Mvar)`, data = mydata_balanced)
+
+summary (OLS_adj)
+
+print("AIC OLS_adj")
+print(AIC(OLS_adj, k=2))
+
+# Breusch-Pagan test for homoskedasticity in a Linear Regression Model 
+
+require(lmtest)
+
+BP <- bptest(OLS)
+
+print(BP)
+
+
+## Variance Inflation Factor Analysis
+# to check if the variables have correlation or not. For example, cons: 0.98. That mean 98% of "cons" can be explained by the other variables. So, we may exclude this variable if needed. When, "NTLaj" is 0.54, that means only 54% of this variable can be explained by the other variables.
+
+# OLS
+print(vif(OLS))
+print(1 - 1/vif(OLS))
+print("1/(1-R2)")
+print(1/(1-0.9627))
+
+
+# OLS_adj
+print("OLS_adj")
+print(vif(OLS_adj))
+print(1 - 1/vif(OLS_adj))
+print("1/(1-R2)")
+print(1/(1-0.9608))
+
+
+# Breusch-Pagan test for homoskedasticity 
+
+require(lmtest)
+
+BP <- bptest(OLS_adj)
+
+print(BP)
+
+
+# print residualplot of OLS
+residualPlot(OLS_adj)
+
+# model prediction
+yhat <- predict(OLS_adj)
+
+# compute MSE 
+require(ModelMetrics)
+
+MSE <- mse(mydata_balanced$OPEX, yhat)
+print("MSE")
+print(MSE)
+
+#compute RMSE
+RMSE <- rmse(mydata_balanced$OPEX, yhat)
+print("RMSE")
+print(RMSE)
+
+```
+## chunk 5: cross-validation OLS_adj model after feature selection 
+```{r}
+
+require(caret)
+set.seed(123)
+
+# cross validation 
+
+# Define training control
+ train.control <- trainControl(method = "cv", number = 10)
+
+# Internal error in the train function is caused by using the model formula. Addressing the variables by their index avoided that error. 
+ 
+# Train the model
+ model <- train(x = mydata_balanced[,c(7,8,11)], y = mydata_balanced[,3], method = "lm", trControl = train.control)
+ 
+# Summarize the results
+ summary(model)
+
+```
+
+## chunk 6: Pooled OLS model: OPEX ~ outputs after feature selection 
+
+```{r}
+require(plm)
+
+POLS <- plm(formula = mydata_balanced$OPEX ~ mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + 
+    mydata_balanced$`Number.of.switch.modes.<.230.kV`  + 
+    mydata_balanced$`Reactive.power.(Mvar)`, data = mydata_balanced, model = "pooling", index = NULL)
+
+summary (POLS)
+
+# the Pooled OLS model of panel data is equal to the classic OLS model
+
+```
+## chunk 7: check assumption of homoscedasticity for Pooled OLS model: OPEX ~ outputs after feature selection 
+```{r}
+# space for the plot
+par(mfrow=c(1,1))
+
+# residuals of OLS model
+res <- as.vector(OLS$residuals)
+print(res)
+# fitted values from the OLS model 
+fitval <- as.vector(fitted(OLS))
+print(fitval)
+
+# plot residuals against fitted values 
+plot(fitval, res, xlab = "fitted value", ylab = "residuals", main = "Homoskedasticity Test")
+abline(lm(res ~ fitval, data = data.frame(res, fitval)), col = "blue")
+
+
+# Breusch-Pagan test for homoskedasticity 
+
+require(lmtest)
+
+BP <- bptest(OLS)
+
+print(BP)
+
+# Durbin-Watson-Test for autocorrelation of disturbances 
+# The Durbin-Watson-Test will have one output between 0 – 4. The mean (= 2) would indicate that there is no autocorrelation identified, 0 – 2 means positive autocorrelation (the nearer to zero the higher the correlation), and 2 – 4 means negative autocorrelation (the nearer to four the higher the correlation).
+
+dwtest(formula = mydata_balanced$OPEX ~ mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + 
+    mydata_balanced$`Number.of.switch.modes.<.230.kV`  + 
+    mydata_balanced$`Reactive.power.(Mvar)`, data = mydata_balanced)
+
+```
+## chunk 8: Pooled OLS model: OPEX ~ outputs
+```{r}
+require(plm)
+
+OLS <- plm(formula= mydata_balanced$OPEX ~ mydata_balanced$`Network.extension.<.230.kV` + mydata_balanced$`Network.extension.≥.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.<.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + mydata_balanced$`Number.of.switch.modes.<.230.kV` + mydata_balanced$`Number.of.switch.modes.≥.230.kV` + mydata_balanced$`Transformation.capacity.(MVA)` + mydata_balanced$`Reactive.power.(Mvar)` + mydata_balanced$`Quality.variable:.Power.not.delivered`, data = mydata_balanced,  model = "pooling", index=NULL, row.names=TRUE)
+
+summary(OLS)
+
+```
+## chunk 9: check assumption of homoscedasticity for Pooled OLS model: OPEX ~ outputs 
+```{r}
+# space for the plot
+par(mfrow=c(1,1))
+
+# residuals of OLS model
+res <- as.vector(OLS$residuals)
+print(res)
+# fitted values from the OLS model 
+fitval <- as.vector(fitted(OLS))
+print(fitval)
+
+# plot residuals against fitted values 
+plot(fitval, res, xlab = "fitted value", ylab = "residuals", main = "Homoskedasticity Test")
+abline(lm(res ~ fitval, data = data.frame(res, fitval)), col = "blue")
+
+
+# Breusch-Pagan test for homoskedasticity 
+
+require(lmtest)
+
+BP <- bptest(OLS)
+
+print(BP)
+
+```
+## chunk 10: check assumption of non-autocorrelation for Pooled OLS model: Opex ~ outputs 
+```{r}
+require (lmtest)
+
+# Durbin-Watson-Test for autocorrelation of disturbances 
+
+dwtest(formula= mydata_balanced$OPEX ~ mydata_balanced$`Network.extension.<.230.kV` + mydata_balanced$`Network.extension.≥.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.<.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + mydata_balanced$`Number.of.switch.modes.<.230.kV` + mydata_balanced$`Number.of.switch.modes.≥.230.kV` + mydata_balanced$`Transformation.capacity.(MVA)` + mydata_balanced$`Reactive.power.(Mvar)` + mydata_balanced$`Quality.variable:.Power.not.delivered`, data = mydata_balanced)
+
+
+
+```
+## chunk 11: Fixed Effect Model (FE): OPEX ~ outputs after feature selection 
+```{r}
+
+require(plm)
+
+
+# FE with individual effects 
+
+FE_individual <- plm(formula = mydata_balanced$OPEX ~ mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + 
+    mydata_balanced$`Number.of.switch.modes.<.230.kV`  + 
+    mydata_balanced$`Reactive.power.(Mvar)`, data = mydata_balanced, model = "within", index = NULL, effect = "individual")
+
+summary(FE_individual)
+print("fixed effects")
+summary(fixef(FE_individual))
+
+# FE with time effects 
+
+FE_time <- plm(formula = mydata_balanced$OPEX ~ mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + 
+    mydata_balanced$`Number.of.switch.modes.<.230.kV`  + 
+    mydata_balanced$`Reactive.power.(Mvar)`, data = mydata_balanced, model = "within", index = NULL, effect = "time")
+
+summary(FE_time)
+print("fixed effects")
+summary(fixef(FE_time))
+
+
+# FE with both effects 
+
+FE_both <- plm(formula = mydata_balanced$OPEX ~ mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + 
+    mydata_balanced$`Number.of.switch.modes.<.230.kV`  + 
+    mydata_balanced$`Reactive.power.(Mvar)`, data = mydata_balanced, model = "within", index = NULL, effect = "twoways")
+
+summary(FE_both)
+print("fixed effects")
+summary(fixef(FE_both))
+
+# model prediction
+yhat_individual <- predict(FE_individual)
+yhat_time <- predict(FE_time)
+yhat_both <- predict(FE_both)
+
+# compute MSE 
+require(ModelMetrics)
+
+print("MSE individual")
+print(mse(mydata_balanced$OPEX, yhat_individual))
+print("MSE time")
+print(mse(mydata_balanced$OPEX, yhat_time))
+print("MSE both")
+print(mse(mydata_balanced$OPEX, yhat_both))
+
+#compute RMSE
+
+print("RMSE individual")
+print(rmse(mydata_balanced$OPEX, yhat_individual))
+print("RMSE time")
+print(rmse(mydata_balanced$OPEX, yhat_time))
+print("RMSE both")
+print(rmse(mydata_balanced$OPEX, yhat_both))
+
+
+
+```
+## chunk 12: F-Test for fixed effects 
+```{r}
+
+# H0: no difference between the FE and the Pooled model 
+# reject the hypothesis if p-value < 0.05 
+
+# individual effects 
+pFtest(FE_individual, OLS_adj)
+
+
+# time effects 
+pFtest(FE_time, OLS_adj)
+
+# both effects
+pFtest(FE_both, OLS_adj)
+
+
+```
+
+## chunk 13: Random Effect Model (RE): OPEX ~ outputs after feature selection
+```{r}
+require(plm)
+
+# RE with individual effects
+
+RE_individual <- plm(formula = mydata_balanced$OPEX ~ mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + 
+    mydata_balanced$`Number.of.switch.modes.<.230.kV`  + 
+    mydata_balanced$`Reactive.power.(Mvar)`, data = mydata_balanced, model = "random", index = NULL, effect = "individual")
+
+summary(RE_individual)
+
+# RE with  time effects 
+
+RE_time <- plm(formula = mydata_balanced$OPEX ~ mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + 
+    mydata_balanced$`Number.of.switch.modes.<.230.kV`  + 
+    mydata_balanced$`Reactive.power.(Mvar)`, data = mydata_balanced, model = "random", index = NULL, effect = "time", random.method = "amemiya")
+
+summary(RE_time)
+
+# RE with  individual and time effects 
+
+RE_both <- plm(formula = mydata_balanced$OPEX ~ mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + 
+    mydata_balanced$`Number.of.switch.modes.<.230.kV`  + 
+    mydata_balanced$`Reactive.power.(Mvar)`, data = mydata_balanced, model = "random", index = NULL, effect = "twoways", random.method = "amemiya")
+
+summary(RE_both)
+
+# model prediction
+yhat_individual <- predict(RE_individual)
+yhat_time <- predict(RE_time)
+yhat_both <- predict(RE_both)
+
+# compute MSE 
+require(ModelMetrics)
+
+print("MSE individual")
+print(mse(mydata_balanced$OPEX, yhat_individual))
+print("MSE time")
+print(mse(mydata_balanced$OPEX, yhat_time))
+print("MSE both")
+print(mse(mydata_balanced$OPEX, yhat_both))
+
+#compute RMSE
+
+print("RMSE individual")
+print(rmse(mydata_balanced$OPEX, yhat_individual))
+print("RMSE time")
+print(rmse(mydata_balanced$OPEX, yhat_time))
+print("RMSE both")
+print(rmse(mydata_balanced$OPEX, yhat_both))
+
+
+```
+
+# chunk 14: Lagrange-Multiplier-Test  for random effects 
+```{r}
+# H0: effects cannot be modeled as random variables 
+# Ho is rejected, if p-value < 0.05
+
+# individual effects 
+plmtest(RE_individual, effect = "individual")
+
+
+# time effects 
+plmtest(RE_time, effect = "time")
+
+# both effects
+plmtest(RE_both, effect = "twoways")
+
+```
+## chunk 15: Hausman Test to compare FE and RE after feature selection 
+```{r}
+# The null hypothesis of this test states that random effects is preferred over fixed effects
+# Ho: there is no correlation between the subject-specific error term and the independent variables
+
+phtest(FE_individual, RE_individual)
+phtest(FE_time, RE_time)
+phtest(FE_both, RE_both)
+
+
+```
+## chunk 16:  FE Model: OPEX ~ outputs
+```{r}
+# FE model individual effects 
+FE_individual <- plm (formula= mydata_balanced$OPEX ~ mydata_balanced$`Network.extension.<.230.kV` + mydata_balanced$`Network.extension.≥.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.<.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + mydata_balanced$`Number.of.switch.modes.<.230.kV` + mydata_balanced$`Number.of.switch.modes.≥.230.kV` + mydata_balanced$`Transformation.capacity.(MVA)` + mydata_balanced$`Reactive.power.(Mvar)` + mydata_balanced$`Quality.variable:.Power.not.delivered`, data = mydata_balanced, model = "within", index = NULL, effect = "individual")
+
+summary(FE_individual)
+
+# FE model time effects 
+FE_time <- plm (formula= mydata_balanced$OPEX ~ mydata_balanced$`Network.extension.<.230.kV` + mydata_balanced$`Network.extension.≥.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.<.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + mydata_balanced$`Number.of.switch.modes.<.230.kV` + mydata_balanced$`Number.of.switch.modes.≥.230.kV` + mydata_balanced$`Transformation.capacity.(MVA)` + mydata_balanced$`Reactive.power.(Mvar)` + mydata_balanced$`Quality.variable:.Power.not.delivered`, data = mydata_balanced, model = "within", index = NULL, effect = "time")
+
+summary(FE_time)
+
+# FE model both effects 
+FE_both <- plm (formula= mydata_balanced$OPEX ~ mydata_balanced$`Network.extension.<.230.kV` + mydata_balanced$`Network.extension.≥.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.<.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + mydata_balanced$`Number.of.switch.modes.<.230.kV` + mydata_balanced$`Number.of.switch.modes.≥.230.kV` + mydata_balanced$`Transformation.capacity.(MVA)` + mydata_balanced$`Reactive.power.(Mvar)` + mydata_balanced$`Quality.variable:.Power.not.delivered`, data = mydata_balanced, model = "within", index = NULL, effect = "twoways")
+
+summary(FE_both)
+
+```
+## chunk 17:  F-Test for fixed effects 
+```{r}
+
+# H0: no difference between the FE and the Pooled model 
+# reject the hypothesis if p-value < 0.05 
+
+# individual effects 
+pFtest(FE_individual, OLS)
+
+
+# time effects 
+pFtest(FE_time, OLS)
+
+# both effects
+pFtest(FE_both, OLS)
+
+```
+## chunk 18: RE Model: OPEX ~ outputs
+```{r}
+# RE model individual effects 
+RE_individual <- plm (formula= mydata_balanced$OPEX ~ mydata_balanced$`Network.extension.<.230.kV` + mydata_balanced$`Network.extension.≥.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.<.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + mydata_balanced$`Number.of.switch.modes.<.230.kV` + mydata_balanced$`Number.of.switch.modes.≥.230.kV` + mydata_balanced$`Transformation.capacity.(MVA)` + mydata_balanced$`Reactive.power.(Mvar)` + mydata_balanced$`Quality.variable:.Power.not.delivered`, data = mydata_balanced, model = "random", index = NULL, effect = "individual")
+
+summary(RE_individual)
+
+# RE model time effects 
+RE_time <- plm (formula= mydata_balanced$OPEX ~ mydata_balanced$`Network.extension.<.230.kV` + mydata_balanced$`Network.extension.≥.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.<.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + mydata_balanced$`Number.of.switch.modes.<.230.kV` + mydata_balanced$`Number.of.switch.modes.≥.230.kV` + mydata_balanced$`Transformation.capacity.(MVA)` + mydata_balanced$`Reactive.power.(Mvar)` + mydata_balanced$`Quality.variable:.Power.not.delivered`, data = mydata_balanced, model = "random", index = NULL, effect = "time", random.method = "amemiya")
+
+summary(RE_time)
+
+# RE model both effects 
+RE_both <- plm (formula= mydata_balanced$OPEX ~ mydata_balanced$`Network.extension.<.230.kV` + mydata_balanced$`Network.extension.≥.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.<.230.kV` + mydata_balanced$`Number.of.power.transformers.and.reactors.≥.230.kV` + mydata_balanced$`Number.of.switch.modes.<.230.kV` + mydata_balanced$`Number.of.switch.modes.≥.230.kV` + mydata_balanced$`Transformation.capacity.(MVA)` + mydata_balanced$`Reactive.power.(Mvar)` + mydata_balanced$`Quality.variable:.Power.not.delivered`, data = mydata_balanced, model = "random", index = NULL, effect = "twoways", random.method = "amemiya")
+
+summary(RE_both)
+```
+# chunk 19: Lagrange-Multiplier-Test  for random effects 
+```{r}
+# H0: effects cannot be modeled as random variables 
+# Ho is rejected, if p-value < 0.05
+
+# individual effects 
+plmtest(RE_individual, effect = "individual")
+
+
+# time effects 
+plmtest(RE_time, effect = "time")
+
+# both effects
+plmtest(RE_both, effect = "twoways")
+
+```
+## chunk 20: Hausman Test to compare FE and RE after feature selection 
+```{r}
+# The null hypothesis of this test states that random effects is preferred over fixed effects
+# Ho: there is no correlation between the subject-specific error term and the independent variables
+
+phtest(FE_individual, RE_individual)
+phtest(FE_time, RE_time)
+phtest(FE_both, RE_both)
+
+```
+
